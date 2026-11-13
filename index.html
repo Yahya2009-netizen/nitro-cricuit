@@ -1,0 +1,1596 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"></head><body>
+<title>Nitro Circuit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=Cairo:wght@500;600;700&display=swap">
+<style>
+/* Layout: full-bleed canvas game, DOM menus laid over it, thumb controls pinned to the bottom corners.
+   Look: night circuit, amber for action, cyan reserved for turbo. */
+:root{
+  --bg:#080c1a; --panel:#111833; --panel2:#18214a; --line:#2a3768;
+  --fg:#eef2ff; --mute:#9aa6d4; --amber:#ffb300; --amber-ink:#2a1c00;
+  --cyan:#19d3ff; --good:#43e08a; --bad:#ff5470;
+  --display:"Chakra Petch","Arial Narrow",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;margin:0;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#app{position:relative;height:100%;width:100%;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0d47a1}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+
+/* ---- screens ---- */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;overflow-y:auto;
+  padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:linear-gradient(180deg,rgba(8,12,26,.88),rgba(8,12,26,.72) 55%,rgba(8,12,26,.9));touch-action:pan-y}
+.screen.clear{background:rgba(8,12,26,.55)}
+.wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:14px;margin:auto 0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.02em;text-wrap:balance}
+.logo{font-size:clamp(40px,11vw,68px);font-weight:700;line-height:.95;text-transform:uppercase;letter-spacing:.03em}
+.logo span{display:block;color:var(--amber)}
+.tag{color:var(--mute);margin:6px 0 0;font-size:14px}
+h2{font-size:26px;text-transform:uppercase}
+h3{font-size:15px;color:var(--mute);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.coins{font-family:var(--display);font-weight:700;font-size:20px;background:var(--panel);border:1px solid var(--line);
+  border-radius:999px;padding:6px 14px;display:inline-flex;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
+.coins i{width:14px;height:14px;border-radius:50%;background:var(--amber);box-shadow:inset 0 0 0 3px #ffd75e;display:inline-block}
+.btn{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;border:0;border-radius:14px;
+  min-height:52px;padding:0 20px;font-size:18px;background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line)}
+.btn:active{transform:translateY(1px);filter:brightness(1.15)}
+.btn.primary{background:var(--amber);color:var(--amber-ink);box-shadow:none;min-height:64px;font-size:24px}
+.btn.small{min-height:40px;font-size:14px;padding:0 14px;border-radius:10px}
+.btn[disabled]{opacity:.45}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.row>div{min-width:0}
+.muted{color:var(--mute);font-size:13px}
+.seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px;box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{flex:1;border:0;background:transparent;border-radius:8px;min-height:38px;font-family:var(--display);font-weight:600;font-size:14px;color:var(--mute);padding:0 10px}
+.seg button.on{background:var(--amber);color:var(--amber-ink)}
+.tabs{display:flex;gap:8px}
+.tabs button{flex:1}
+.pips{display:flex;gap:4px}
+.pips b{width:100%;height:8px;border-radius:2px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);display:block}
+.pips b.on{background:var(--amber);box-shadow:none}
+.upg{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+.upg .pips{grid-column:1/-1}
+.upg h3{color:var(--fg);font-size:17px;letter-spacing:.04em}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.sw{background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.sw.sel{border-color:var(--amber)}
+.sw canvas{width:84px;height:62px}
+.sw .nm{font-family:var(--display);font-weight:600}
+.stat{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
+table.res{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.res td{padding:5px 6px;border-bottom:1px solid var(--line)}
+table.res tr.me td{color:var(--amber);font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px}
+.earn{font-family:var(--display);font-size:30px;color:var(--amber);font-weight:700}
+.hint{text-align:center;color:var(--mute);font-size:13px}
+.flash{position:absolute;left:50%;top:14%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-family:var(--display);font-weight:600;z-index:30}
+
+/* ---- thumb controls ---- */
+#touch{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;
+  padding:10px max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-right,0px))}
+#touch .grp{display:flex;gap:12px;pointer-events:none}
+#touch button{pointer-events:auto;touch-action:none;border:2px solid rgba(255,255,255,.35);background:rgba(10,16,40,.5);
+  color:#fff;border-radius:22px;font-family:var(--display);font-weight:700;font-size:22px;width:var(--cb,84px);height:var(--cb,84px);backdrop-filter:blur(2px)}
+#touch button.on{background:rgba(255,179,0,.75);color:#2a1c00;border-color:#fff}
+#touch button.turbo{border-color:var(--cyan);color:var(--cyan);font-size:15px}
+#touch button.turbo.on{background:rgba(25,211,255,.8);color:#021a22}
+#touch button.wide{width:calc(var(--cb,84px)*1.15);font-size:15px}
+#pauseBtn{position:absolute;z-index:5;top:4px;right:max(8px,env(safe-area-inset-right,0px));
+  background:rgba(10,16,40,.6);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:0 14px;height:30px;font-family:var(--display);font-weight:700;letter-spacing:.08em;font-size:13px}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (orientation:landscape) and (max-height:520px){
+  .wrap.home{max-width:880px;display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;align-items:center}
+}
+@media (max-height:430px){.screen{padding-block:10px}.wrap{gap:10px}.btn.primary{min-height:52px}.logo{font-size:40px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- podium ---- */
+.podium{width:100%;max-width:520px;height:auto;aspect-ratio:640/300;align-self:center}
+details.card summary{font-family:var(--display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);cursor:pointer}
+/* ---- splash, toasts, new cards ---- */
+#splash{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  background:radial-gradient(120% 90% at 50% 20%,#17214a,#080c1a 70%);transition:opacity .45s}
+#splash.out{opacity:0;pointer-events:none}
+.sp-logo{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(34px,9vw,60px);letter-spacing:.06em;line-height:1;text-align:center}
+.sp-logo span{color:var(--amber)}
+.sp-by{font-family:var(--display);letter-spacing:.2em;text-transform:uppercase;color:var(--mute);font-size:clamp(13px,3.4vw,18px);margin-top:10px;text-align:center}
+.sp-by b{color:var(--fg)}
+.sp-load{width:min(320px,72vw);display:flex;flex-direction:column;gap:8px;align-items:center}
+.sp-track{width:100%;height:10px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+#splashBar{height:100%;width:0;background:linear-gradient(90deg,var(--amber),#ffd75e);border-radius:999px}
+#splashPct{font-family:var(--display);font-size:13px;color:var(--mute);letter-spacing:.1em;font-variant-numeric:tabular-nums}
+.flash.gold{background:var(--amber);color:var(--amber-ink);border-color:#fff}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid3 .btn{font-size:14px;padding:0 6px;min-height:48px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{border:0;border-radius:999px;min-height:38px;padding:0 14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);font-family:var(--display);font-weight:600;font-size:14px;color:var(--mute)}
+.chips button.on{background:var(--amber);color:var(--amber-ink);box-shadow:none}
+.chips button.lock{opacity:.7}.chips button span{font-size:12px;opacity:.8}
+.card.selc{border-color:var(--amber)}
+.carc{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center}
+.carc canvas{width:96px;height:72px}
+.carx{display:flex;flex-direction:column;gap:5px;min-width:0}
+.barrow{display:grid;grid-template-columns:62px 1fr;gap:8px;align-items:center;font-size:12px;color:var(--mute)}
+.bar{height:6px;border-radius:3px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--amber)}
+.tprev{width:100%;height:auto;aspect-ratio:8/3;border-radius:10px;display:block}
+.aw{font-family:var(--display);font-weight:700;color:var(--amber);white-space:nowrap}.aw.done{color:var(--good)}
+
+/* ---- language, code box ---- */
+body.ar{--display:"Cairo","Chakra Petch",system-ui,sans-serif;--body:"Cairo","Inter",system-ui,sans-serif}
+body.ar .logo,body.ar .sp-logo{letter-spacing:0}
+body.ar h2,body.ar h3,body.ar .sp-by{letter-spacing:0;text-transform:none}
+.langs{display:flex;gap:8px}.langs button{flex:1;border:0;border-radius:999px;min-height:38px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-family:var(--body);font-weight:600;font-size:14px;color:var(--mute)}
+.langs button.on{background:var(--amber);color:var(--amber-ink);box-shadow:none}
+input{user-select:text;-webkit-user-select:text;touch-action:auto}
+.codebox{display:flex;gap:10px}.codebox input{flex:1;min-width:0;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:16px;padding:0 12px}
+.tabs.wrapx{flex-wrap:wrap}.tabs.wrapx button{flex:1 1 30%}
+</style>
+<div id="app">
+  <canvas id="cv"></canvas>
+  <button id="pauseBtn" hidden>PAUSE</button>
+  <div id="touch" hidden>
+    <div class="grp"><button id="bL" aria-label="Steer left">&#9664;</button><button id="bR" aria-label="Steer right">&#9654;</button></div>
+    <div class="grp"><button id="bBrake" class="wide">BRAKE</button><button id="bTurbo" class="turbo wide">TURBO</button><button id="bGas" class="wide" hidden>GAS</button></div>
+  </div>
+  <div id="screen" class="screen"></div>
+  <div id="splash"><div><div class="sp-logo">Nitro <span>Circuit</span></div><div class="sp-by" id="spBy">Created by <b>Yahya</b></div></div>
+    <div class="sp-load"><div class="sp-track"><div id="splashBar"></div></div><div id="splashPct">0%</div></div></div>
+</div>
+<script>
+'use strict';
+/* ================= constants ================= */
+const SEG_LEN = 200, ROAD_W = 3000, LANES = 4, FOV = 100;
+const CAM_DEPTH = 1 / Math.tan(FOV / 2 * Math.PI / 180);
+const CAR_Z = 1000 * CAM_DEPTH, RUMBLE = 3;
+const STEP = 1 / 60, MAX_SPEED = SEG_LEN / STEP;
+const ACCEL = MAX_SPEED / 5, BRAKE = -MAX_SPEED, DECEL = -MAX_SPEED / 5;
+const OFFROAD_DECEL = -MAX_SPEED / 2, OFFROAD_LIMIT = MAX_SPEED / 4;
+const TURBO_ACCEL_MULT = 3.0, TURBO_DRAIN = 28, TURBO_RECHARGE = 7;
+const LAT = 0.85, CAR_W_WORLD = 800, CAR_FRAC = CAR_W_WORLD / ROAD_W;
+const CAMERAS = [['CHASE', 1000], ['HIGH', 1700], ['COCKPIT', 520]];
+const DIFFICULTY = {
+  EASY:   { ai: [0.66, 0.82], centrifugal: 0.10, crash: 0.85, offroad: 0.30, steer: 1.40, aheadSlow: 0.88, behindBoost: 1.00, pay: 0.7 },
+  NORMAL: { ai: [0.84, 0.96], centrifugal: 0.20, crash: 0.65, offroad: 0.65, steer: 1.15, aheadSlow: 0.95, behindBoost: 1.02, pay: 1.0 },
+  HARD:   { ai: [0.88, 1.00], centrifugal: 0.30, crash: 0.50, offroad: 1.00, steer: 1.00, aheadSlow: 0.96, behindBoost: 1.04, pay: 1.5 }
+};
+const AI_NAMES = ['Karim','Yacine','Amine','Sofiane','Nadir','Walid','Anis','Riad','Zaki','Hakim'];
+const AI_COLORS = ['#e53935','#fdd835','#8e24aa','#fb8c00','#00acc1','#43a047','#f06292','#8d6e63','#cddc39','#ffffff'];
+const SH = {
+  peaks1: [[0,0],[60,-50],[130,-20],[200,-85],[290,-30],[360,-70],[430,-25],[520,-60],[580,-20],[640,0]],
+  peaks2: [[0,0],[80,-25],[160,-45],[240,-15],[330,-40],[410,-18],[500,-48],[570,-22],[640,0]],
+  dunes1: [[0,0],[70,-16],[150,-34],[240,-14],[330,-30],[430,-12],[520,-28],[580,-14],[640,0]],
+  dunes2: [[0,0],[100,-10],[200,-22],[300,-8],[400,-20],[520,-9],[640,0]],
+  alps1:  [[0,0],[50,-70],[90,-35],[150,-110],[210,-45],[290,-95],[350,-30],[430,-120],[500,-50],[570,-85],[640,0]],
+  alps2:  [[0,0],[70,-40],[130,-70],[200,-30],[290,-65],[380,-25],[460,-75],[550,-35],[640,0]],
+  mesa1:  [[0,0],[40,0],[52,-62],[122,-66],[136,0],[230,0],[242,-46],[300,-50],[314,0],[400,0],[412,-78],[486,-82],[498,0],[640,0]],
+  mesa2:  [[0,0],[60,0],[70,-30],[150,-34],[160,0],[280,0],[290,-26],[360,-30],[370,0],[500,0],[512,-36],[580,-38],[590,0],[640,0]],
+  hills1: [[0,0],[80,-38],[170,-60],[260,-32],[350,-64],[450,-36],[550,-58],[640,0]],
+  hills2: [[0,0],[100,-24],[220,-40],[330,-20],[440,-42],[560,-22],[640,0]]
+};
+const THEMES = {
+  coast: { name: 'Coast', blurb: 'Sunny seaside road', cost: 0, pay: 1.0,
+    sky: ['#0d47a1','#1565c0','#1e88e5','#42a5f5','#64b5f6','#90caf9','#bbdefb','#e3f2fd'],
+    sun: { x: 0.78, y: 0.3, r: 28, c: '#fff59d' }, m1: '#5c6bc0', m2: '#7986cb', s1: SH.peaks1, s2: SH.peaks2,
+    g1: '#10aa10', g2: '#009a00', road1: '#6b6b6b', road2: '#696969', rum1: '#c62828', rum2: '#f5f5f5', lane: '#cccccc', swatch: '#42a5f5',
+    fog: [220, 235, 255, 0.20],
+    zones: [{ to: .40, name: 'Seaside', kinds: ['marshal', 'crowd', 'crowd', 'palm', 'palm', 'bush', 'banner'] }, { to: .75, name: 'Marina', kinds: ['marshal', 'crowd', 'crowd', 'billboard', 'lamp', 'grand', 'bush'] }, { to: 1, name: 'Cliffs', kinds: ['marshal', 'crowd', 'crowd', 'rock', 'bush', 'palm'] }] },
+  desert: { name: 'Sahara', blurb: 'Long straights, big dunes', cost: 300, pay: 1.1,
+    sky: ['#6d2f17','#a94a1b','#d9772a','#f09e44','#f7c070','#fad79b','#fce6bc','#fff1d6'],
+    sun: { x: 0.28, y: 0.62, r: 42, c: '#ffe08a' }, m1: '#b5753a', m2: '#d19a5a', s1: SH.dunes1, s2: SH.dunes2,
+    g1: '#e2b25e', g2: '#d3a04a', road1: '#5a524d', road2: '#564e49', rum1: '#d84315', rum2: '#fff3e0', lane: '#f5e6c8', swatch: '#e2a54a',
+    fog: [250, 215, 150, 0.30], weather: 'dust', dust: '#e8c98a',
+    zones: [{ to: .40, name: 'Dunes', kinds: ['marshal', 'crowd', 'crowd', 'cactus', 'rock', 'cactus'] }, { to: .70, name: 'Oasis', kinds: ['marshal', 'crowd', 'crowd', 'palm', 'bush', 'palm', 'rock'] }, { to: 1, name: 'Salt Flats', kinds: ['marshal', 'crowd', 'crowd', 'rock', 'billboard', 'cactus'] }] },
+  alps: { name: 'Alps', blurb: 'Snow, tight corners, steep hills', cost: 600, repeat: true, pay: 1.25, snow: true,
+    sky: ['#6a87ad','#819fc2','#9bb5d2','#b3c8de','#c8d8e8','#dbe6f1','#e9f0f7','#f5f8fb'],
+    sun: { x: 0.2, y: 0.4, r: 20, c: '#ffffff' }, m1: '#9fb0cc', m2: '#c4d1e4', s1: SH.alps1, s2: SH.alps2,
+    g1: '#f3f8ff', g2: '#dce8f5', road1: '#6d7787', road2: '#687282', rum1: '#1e63c8', rum2: '#ffffff', lane: '#eef4ff', swatch: '#cfe0f5',
+    fog: [235, 240, 248, 0.34], dust: '#ffffff',
+    zones: [{ to: .35, name: 'Pine Valley', kinds: ['marshal', 'crowd', 'crowd', 'pine', 'pine', 'rock'] }, { to: .55, name: 'Mountain Tunnel', tunnel: true, kinds: [] }, { to: 1, name: 'Summit', kinds: ['marshal', 'crowd', 'crowd', 'pine', 'rock', 'banner', 'pine'] }] },
+  night: { name: 'Night', blurb: 'Dark road, headlights on', cost: 900, repeat: true, pay: 1.4, stars: true, dark: true,
+    sky: ['#02030a','#050818','#0a1030','#101a48','#1a2660','#243279','#33408f','#46549f'],
+    moon: { x: 0.8, y: 0.28, r: 20, c: '#f4f1dc' }, m1: '#0e1536', m2: '#18214a', s1: SH.peaks1, s2: SH.peaks2,
+    g1: '#0b3a1c', g2: '#082e16', road1: '#34343f', road2: '#30303a', rum1: '#b71c1c', rum2: '#cfd8dc', lane: '#b0bec5', swatch: '#243279',
+    fog: [30, 50, 110, 0.35], city: true,
+    zones: [{ to: .30, name: 'Highway', kinds: ['marshal', 'crowd', 'crowd', 'lamp', 'billboard', 'lamp', 'rock'] }, { to: .50, name: 'Harbor Tunnel', tunnel: true, kinds: [] }, { to: 1, name: 'Skyline', kinds: ['marshal', 'crowd', 'crowd', 'building', 'lamp', 'billboard', 'building'] }] },
+  canyon: { name: 'Canyon', blurb: 'Fast bends between red mesas', cost: 450, pay: 1.18, repeat: true,
+    sky: ['#2b1055','#512a73','#8e3b7a','#c9506b','#ee7a5f','#f6a35a','#f9c76a','#fce39a'],
+    sun: { x: 0.3, y: 0.7, r: 40, c: '#ffd9a0' }, m1: '#8a3a22', m2: '#b4532f', s1: SH.mesa1, s2: SH.mesa2,
+    g1: '#b5532a', g2: '#a24a25', road1: '#46403d', road2: '#433d3a', rum1: '#fbc02d', rum2: '#212121', lane: '#fff3c4', swatch: '#b4532f',
+    fog: [240, 150, 100, 0.26], weather: 'dust', dust: '#d9895a',
+    zones: [{ to: .5, name: 'Mesa Pass', kinds: ['marshal', 'crowd', 'crowd', 'mesa', 'rock', 'cactus', 'mesa'] }, { to: 1, name: 'Sunset Rim', kinds: ['marshal', 'crowd', 'crowd', 'mesa', 'rock', 'lamp'] }] },
+  rain: { name: 'Rainforest', blurb: 'Wet road and thick jungle', cost: 750, pay: 1.32, repeat: true, wet: true,
+    sky: ['#2f3b3a','#3b4a49','#4d5f5d','#5f7471','#71857f','#86988f','#9aa99f','#b1bdb3'],
+    m1: '#2c4a3b', m2: '#3d5c4b', s1: SH.hills1, s2: SH.hills2,
+    g1: '#1f5a2b', g2: '#1a4d25', road1: '#3a3e44', road2: '#373b41', rum1: '#bf360c', rum2: '#eeeeee', lane: '#d7dde6', swatch: '#4d5f5d',
+    fog: [150, 170, 165, 0.42], weather: 'rain',
+    zones: [{ to: .5, name: 'Jungle', kinds: ['marshal', 'crowd', 'crowd', 'tree', 'bush', 'tree'] }, { to: .8, name: 'Riverside', kinds: ['marshal', 'crowd', 'crowd', 'tree', 'rock', 'banner'] }, { to: 1, name: 'Paddock', kinds: ['marshal', 'crowd', 'crowd', 'grand', 'banner', 'lamp', 'tree'] }] }
+};
+const TRACK_IDS = ['coast', 'desert', 'canyon', 'alps', 'rain', 'night'];
+const TUNNEL_GROUND = ['#14151b', '#101116'];
+
+const PAINTS = [
+  { id: 'blue',   name: 'Azure',   color: '#1e88e5', cost: 0 },
+  { id: 'red',    name: 'Rally',   color: '#e53935', cost: 200 },
+  { id: 'green',  name: 'Mamba',   color: '#2ecc71', cost: 300 },
+  { id: 'gold',   name: 'Sahara',  color: '#f5b301', cost: 400 },
+  { id: 'purple', name: 'Violet',  color: '#9b59ff', cost: 500 },
+  { id: 'white',  name: 'Ghost',   color: '#f2f4ff', cost: 600 },
+  { id: 'black',  name: 'Onyx',    color: '#2b2f3a', cost: 800 },
+  { id: 'pink',   name: 'Flamingo',color: '#ff5fa2', cost: 1000 }
+];
+const UPGRADES = [
+  { id: 'engine',   name: 'Engine',   desc: 'Higher top speed',          fx: l => tr('+{0}% top speed', l * 4) },
+  { id: 'turbo',    name: 'Turbo',    desc: 'Lasts longer, refills faster', fx: l => tr('-{0}% burn, +{1}% refill', Math.round((1 - 1 / (1 + 0.15 * l)) * 100), l * 20) },
+  { id: 'handling', name: 'Handling', desc: 'Sharper steering',           fx: l => tr('+{0}% steering', l * 6) },
+  { id: 'grip',     name: 'Grip',     desc: 'Less slowdown off road and in crashes', fx: l => tr('-{0}% off-road drag', l * 15) }
+];
+const CARS = [
+  { id: 'gt',  name: 'Street GT',    kind: 'gt', cost: 0,    top: 1.00, acc: 1.00, hnd: 1.00, accent: null,      note: 'Balanced and forgiving' },
+  { id: 'f1a', name: 'Apex F1',      kind: 'f1', cost: 1500, top: 1.06, acc: 1.20, hnd: 1.05, accent: '#f5f5f5', note: 'Quick off the line' },
+  { id: 'f1b', name: 'Silver Arrow', kind: 'f1', cost: 3000, top: 1.10, acc: 1.30, hnd: 1.10, accent: '#15171c', note: 'Fast and sharp' },
+  { id: 'f1c', name: 'Papaya GP',    kind: 'f1', cost: 5000, top: 1.14, acc: 1.40, hnd: 1.15, accent: '#1565c0', note: 'The fastest car here' }
+];
+const UP_COST = [150, 300, 550, 900, 1400], UP_MAX = 5;
+const PAY = [300, 220, 170, 130, 100, 80, 60, 50, 40, 30, 20];
+
+/* ================= helpers ================= */
+const lerp = (a, b, p) => a + (b - a) * p;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const easeIn = (a, b, p) => a + (b - a) * p * p;
+const easeInOut = (a, b, p) => a + (b - a) * (-Math.cos(p * Math.PI) / 2 + 0.5);
+const fmtTime = t => Math.floor(t / 60) + ':' + (t % 60).toFixed(2).padStart(5, '0');
+const rnd = (a, b) => a + Math.random() * (b - a);
+function mulberry(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ================= save data ================= */
+const SAVE_KEY = 'nitro-circuit-v1';
+const defaults = () => ({
+  coins: 0, paint: 'blue', owned: ['blue'], up: { engine: 0, turbo: 0, handling: 0, grip: 0 },
+  best: {}, races: 0, wins: 0, tracks: ['coast'], raced: [], ach: {}, car: 'gt', cars: ['gt'],
+  set: { level: 'EASY', laps: 2, cam: 0, track: 'coast', autoGas: true, music: true, sfx: true, vibrate: true, quality: 1, ctrl: 1, steer: 1, mirror: true, lang: null }
+});
+let save = defaults();
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const o = JSON.parse(raw), d = defaults();
+      save = Object.assign(d, o, { up: Object.assign(d.up, o.up), set: Object.assign(d.set, o.set), owned: o.owned || d.owned, tracks: o.tracks || d.tracks, raced: o.raced || d.raced, ach: o.ach || d.ach, cars: o.cars || d.cars });
+    }
+  } catch (e) { /* storage blocked: play without saving */ }
+}
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+const price = n => (save && save.free) ? 0 : n;
+const paintColor = () => (PAINTS.find(p => p.id === save.paint) || PAINTS[0]).color;
+const curCar = () => CARS.find(c => c.id === save.car) || CARS[0];
+
+/* ================= track ================= */
+const LAYOUTS = {
+  coast: [
+    [25,25,25,0,0],[20,20,20,0,30],[25,25,25,4,0],[20,20,20,0,-30],[30,40,30,-5,20],[25,25,25,0,0],
+    [20,30,20,6,-20],[15,15,15,0,50],[25,25,25,-3,-50],[25,30,25,4,0],[20,20,20,-6,0],[30,30,30,0,0],
+    [30,60,30,0,0],[35,45,35,3,0],[25,35,25,-4,15],[20,20,20,0,-15],[25,25,25,5,0],[30,40,30,-3,0]],
+  desert: [
+    [35,70,35,0,0],[30,40,30,2,25],[30,40,30,0,-25],[40,60,40,-3,0],[25,30,25,0,40],[25,30,25,0,-40],
+    [35,50,35,4,0],[30,40,30,0,0],[40,50,40,-2,20],[30,30,30,0,-20],[45,70,45,0,0],[30,40,30,3,0]],
+  alps: [
+    [20,20,20,0,0],[15,20,15,6,30],[15,15,15,-7,-30],[20,25,20,5,50],[15,15,15,-6,-50],[20,20,20,7,0],
+    [15,15,15,0,25],[20,20,20,-7,-25],[25,30,25,3,0],[15,20,15,-6,40],[20,20,20,6,-40],[25,25,25,0,0]],
+  night: [
+    [25,35,25,0,0],[20,20,20,5,20],[20,20,20,-5,-20],[30,40,30,0,35],[25,25,25,4,-35],[20,30,20,-6,0],
+    [25,25,25,0,0],[15,15,15,6,0],[20,20,20,-4,15],[25,30,25,0,-15],[20,20,20,5,0],[30,40,30,-3,0]],
+  canyon: [
+    [30,40,30,3,20],[25,25,25,-6,-20],[20,30,20,5,30],[25,25,25,-4,-30],[30,40,30,0,0],[20,20,20,7,15],
+    [20,20,20,-7,-15],[40,60,40,0,0],[25,30,25,4,25],[25,30,25,-5,-25],[30,50,30,0,0]],
+  rain: [
+    [25,25,25,4,0],[20,30,20,-5,15],[20,25,20,6,-15],[30,40,30,0,10],[25,25,25,-6,-10],[20,20,20,5,0],
+    [30,50,30,0,0],[25,30,25,-4,20],[20,20,20,6,-20],[30,40,30,0,0]]
+};
+const NEAR = { lamp: [0.06, 0.25], banner: [0.08, 0.3], billboard: [0.12, 0.5], grand: [0.15, 0.4], building: [0.7, 2.4], crowd: [0.35, 0.8], marshal: [0.1, 0.25] };
+function buildTrack(id) {
+  const segs = [];
+  const lastY = () => segs.length ? segs[segs.length - 1].y2 : 0;
+  const add = (curve, y) => {
+    const n = segs.length;
+    segs.push({ index: n, z1: n * SEG_LEN, z2: (n + 1) * SEG_LEN, y1: lastY(), y2: y, curve, light: Math.floor(n / RUMBLE) % 2 === 0, zone: 0, props: null });
+  };
+  const road = (enter, hold, leave, curve, height) => {
+    const start = lastY(), end = start + height * SEG_LEN, total = enter + hold + leave;
+    for (let n = 0; n < enter; n++) add(easeIn(0, curve, n / enter), easeInOut(start, end, n / total));
+    for (let n = 0; n < hold; n++) add(curve, easeInOut(start, end, (enter + n) / total));
+    for (let n = 0; n < leave; n++) add(easeInOut(curve, 0, n / leave), easeInOut(start, end, (enter + hold + n) / total));
+  };
+  const L = THEMES[id].repeat ? LAYOUTS[id].concat(LAYOUTS[id].slice().reverse()) : LAYOUTS[id];
+  for (const sign of [1, -1]) for (const [e, h, l, c, y] of L) road(e, h, l, c * sign, y);
+  segs[segs.length - 1].y2 = 0;
+  return segs;
+}
+let segments, NSEG, TRACK_LEN, mapUnit, T = THEMES.coast, trackId = 'coast';
+const findSeg = z => segments[Math.floor(z / SEG_LEN) % NSEG];
+const wrapD = d => { const h = TRACK_LEN / 2; return ((d + h) % TRACK_LEN + TRACK_LEN) % TRACK_LEN - h; };
+function loadTrack(id) {
+  trackId = THEMES[id] ? id : 'coast'; T = THEMES[trackId];
+  segments = buildTrack(trackId); NSEG = segments.length; TRACK_LEN = NSEG * SEG_LEN;
+  const rng = mulberry(trackId.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
+  for (const sg of segments) {          // zones (regions of the lap) and roadside props
+    const f = sg.index / NSEG;
+    sg.zone = Math.max(0, T.zones.findIndex(z => f < z.to));
+    const z = T.zones[sg.zone];
+    if (z.tunnel || sg.index < 12 || rng() > 0.34) continue;
+    sg.props = [];
+    for (let i = rng() < 0.25 ? 2 : 1; i > 0; i--) {
+      const k = z.kinds[Math.floor(rng() * z.kinds.length)], r = NEAR[k] || [0.2, 1.9];
+      sg.props.push({ k, o: r[0] + rng() * (r[1] - r[0]), s: rng() < 0.5 ? -1 : 1, v: rng() });
+    }
+  }
+  let x = 0, y = 0, hd = 0; const pts = [];
+  for (const s of segments) { pts.push([x, y]); hd += s.curve * 0.004 + 2 * Math.PI / NSEG; x += Math.cos(hd); y += Math.sin(hd); }
+  const q = pts.map(([px, py], i) => [px - x * i / NSEG, py - y * i / NSEG]);
+  const xs = q.map(p => p[0]), ys = q.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  mapUnit = { pts: q.map(([px, py]) => [(px - x0) / (x1 - x0), (py - y0) / (y1 - y0)]), asp: (x1 - x0) / (y1 - y0) };
+}
+loadTrack('coast');
+const zoneAt = pos => T.zones[Math.max(0, T.zones.findIndex(z => (pos % TRACK_LEN) / TRACK_LEN < z.to))];
+
+/* ================= achievements ================= */
+const run = { crashes: 0, turbo: 0, maxKmh: 0, done: false };
+const ACH = [
+  { id: 'first',  name: 'First Win',     desc: 'Win a race',                           coins: 100, test: () => save.wins >= 1 },
+  { id: 'five',   name: 'Champion',      desc: 'Win 5 races',                          coins: 250, test: () => save.wins >= 5 },
+  { id: 'ten',    name: 'Veteran',       desc: 'Finish 10 races',                      coins: 200, test: () => save.races >= 10 },
+  { id: 'clean',  name: 'Clean Driver',  desc: 'Finish a race without a crash',        coins: 150, test: () => run.done && run.crashes === 0 },
+  { id: 'turbo',  name: 'Turbo Addict',  desc: 'Burn turbo for 15 s in one race',      coins: 100, test: () => run.turbo >= 15 },
+  { id: 'speed',  name: 'Speed Demon',   desc: 'Reach 300 km/h',                       coins: 150, test: () => run.maxKmh >= 300 },
+  { id: 'podium', name: 'Hard Podium',   desc: 'Finish top 3 on Hard',                 coins: 300, test: () => run.done && save.set.level === 'HARD' && lastRank <= 3 },
+  { id: 'globe',  name: 'Globetrotter',  desc: 'Race on every circuit',                coins: 300, test: () => save.raced.length >= TRACK_IDS.length },
+  { id: 'night',  name: 'Night Owl',     desc: 'Win a race on the Night track',        coins: 250, test: () => run.done && lastRank === 1 && trackId === 'night' },
+  { id: 'paints', name: 'Collector',     desc: 'Own 4 paints',                         coins: 150, test: () => save.owned.length >= 4 },
+  { id: 'maxed',  name: 'Fully Tuned',   desc: 'Max out any upgrade',                  coins: 200, test: () => UPGRADES.some(u => up(u.id) >= UP_MAX) },
+  { id: 'f1',     name: 'Pit Lane',      desc: 'Buy an F1 car',                        coins: 250, test: () => save.cars.some(id => (CARS.find(c => c.id === id) || {}).kind === 'f1') },
+  { id: 'wet',    name: 'Rain Master',   desc: 'Win a race on the Rainforest track',   coins: 300, test: () => run.done && lastRank === 1 && trackId === 'rain' },
+  { id: 'unlock', name: 'Explorer',      desc: 'Unlock every circuit',                 coins: 300, test: () => save.tracks.length >= TRACK_IDS.length }
+];
+
+
+/* ================= languages: English, Francais, Arabic ================= */
+const LANGS = [['en', 'English'], ['fr', 'Français'], ['ar', 'العربية']];
+const I18N = {
+fr: {
+ 'Created by': 'Créé par', 'Loading': 'Chargement',
+ '11 cars, 6 circuits. Win coins, buy F1 cars, unlock every track.': '11 voitures, 6 circuits. Gagne des pièces, achète des F1, débloque tous les circuits.',
+ '{0} races, {1} wins': '{0} courses, {1} victoires', 'Circuit': 'Circuit', 'Difficulty': 'Difficulté', 'Laps': 'Tours', 'Easy': 'Facile', 'Normal': 'Normal', 'Hard': 'Difficile',
+ 'Best race time': 'Meilleur temps', 'Pays': 'Gain', 'up to {0} coins': "jusqu'à {0} pièces", 'Race': 'Course', 'Garage': 'Garage', 'Awards': 'Trophées', 'Settings': 'Réglages', 'Zones': 'Zones',
+ 'Paused': 'Pause', 'Resume': 'Reprendre', 'Restart': 'Recommencer', 'Quit to menu': 'Quitter au menu', 'PAUSE': 'PAUSE',
+ 'You won': 'Tu as gagné', 'Podium finish, {0}': 'Sur le podium, {0}', 'Finished {0}': 'Terminé {0}', '+{0} coins': '+{0} pièces',
+ 'New best time on {0}, {1} laps': 'Nouveau record sur {0}, {1} tours', 'Your time {0}': 'Ton temps {0}', 'best lap {0}': 'meilleur tour {0}', 'Full results': 'Résultats complets', 'racing': 'en course', 'Race again': 'Rejouer', 'Menu': 'Menu', 'Back': 'Retour',
+ 'Each award pays coins the first time you earn it.': 'Chaque trophée rapporte des pièces la première fois.', 'Done': 'Fait',
+ 'Easy: slower rivals, forgiving crashes': 'Facile : rivaux plus lents, chocs indulgents', 'Camera': 'Caméra', 'Switch in a race with C on a keyboard': 'En course, touche C au clavier', 'Chase': 'Poursuite', 'High': 'Haute', 'Cockpit': 'Cockpit',
+ 'Auto gas': 'Gaz auto', 'Off adds a GAS button': 'Désactivé : ajoute un bouton GAZ', 'Steering': 'Direction', 'Soft': 'Douce', 'Sharp': 'Vive', 'Button size': 'Taille des boutons', 'Small': 'Petit', 'Medium': 'Moyen', 'Large': 'Grand',
+ 'Graphics': 'Graphismes', 'Lower it if the game stutters': 'Baisse-le si le jeu saccade', 'Low': 'Bas', 'Music': 'Musique', 'Sound effects': 'Effets sonores', 'Vibration': 'Vibration', 'On crashes, where the phone allows it': 'Lors des chocs, si le téléphone le permet',
+ 'Rear-view mirror': 'Rétroviseur', 'Shows cars behind you': 'Montre les voitures derrière toi', 'On': 'Oui', 'Off': 'Non', 'Fullscreen': 'Plein écran', 'Reset progress': 'Réinitialiser', 'Tap again to erase': 'Appuie encore pour effacer', 'Language': 'Langue',
+ 'Upgrades': 'Améliorations', 'Paint': 'Peinture', 'Cars': 'Voitures', 'Circuits': 'Circuits', 'level {0}/{1}': 'niveau {0}/{1}', '{0}. Now {1}': '{0}. Actuel : {1}', 'Maxed': 'Max', '{0} coins': '{0} pièces', 'Equipped': 'Équipé', 'Equip': 'Équiper',
+ 'Select': 'Choisir', 'Selected': 'Choisi', 'Unlock for {0} coins': 'Débloquer : {0} pièces', 'Speed': 'Vitesse', 'Accel': 'Accél.', 'Handling': 'Tenue', 'pays x{0}': 'gain x{0}',
+ 'Win races to earn coins. Harder levels and later circuits pay more.': 'Gagne des courses pour des pièces. Niveaux difficiles et circuits avancés paient plus.', '{0} is locked': '{0} est verrouillé',
+ '{0} unlocked': '{0} débloqué', '{0} bought': '{0} acheté', '{0} level {1}': '{0} niveau {1}', 'Fullscreen is not available here': 'Plein écran indisponible ici', 'Progress erased': 'Progression effacée', 'Achievement: {0}  +{1}': 'Trophée : {0}  +{1}',
+ 'LAP': 'TOUR', 'POS': 'POS', 'km/h': 'km/h', 'TURBO': 'TURBO', 'BRAKE': 'FREIN', 'GAS': 'GAZ', 'CRASH!': 'CHOC !', 'OFF ROAD': 'HORS PISTE', 'GO!': 'GO !', 'YOU': 'TOI',
+ 'Steer left': 'Gauche', 'Steer right': 'Droite',
+ /* circuits */
+ 'Coast': 'Côte', 'Sunny seaside road': 'Route ensoleillée en bord de mer', 'Seaside': 'Bord de mer', 'Marina': 'Marina', 'Cliffs': 'Falaises',
+ 'Sahara': 'Sahara', 'Long straights, big dunes': 'Longues lignes droites, grandes dunes', 'Dunes': 'Dunes', 'Oasis': 'Oasis', 'Salt Flats': 'Salines',
+ 'Alps': 'Alpes', 'Snow, tight corners, steep hills': 'Neige, virages serrés, côtes raides', 'Pine Valley': 'Vallée des pins', 'Mountain Tunnel': 'Tunnel de montagne', 'Summit': 'Sommet',
+ 'Night': 'Nuit', 'Dark road, headlights on': 'Route sombre, phares allumés', 'Highway': 'Autoroute', 'Harbor Tunnel': 'Tunnel du port', 'Skyline': 'Horizon urbain',
+ 'Canyon': 'Canyon', 'Fast bends between red mesas': 'Virages rapides entre mesas rouges', 'Mesa Pass': 'Col des mesas', 'Sunset Rim': 'Corniche du couchant',
+ 'Rainforest': 'Forêt tropicale', 'Wet road and thick jungle': 'Route mouillée et jungle dense', 'Jungle': 'Jungle', 'Riverside': 'Bord de rivière', 'Paddock': 'Paddock',
+ /* cars, paints, upgrades */
+ 'Street GT': 'GT de rue', 'Balanced and forgiving': 'Équilibrée et facile', 'Apex F1': 'Apex F1', 'Quick off the line': 'Vive au départ', 'Silver Arrow': 'Flèche d\'argent', 'Fast and sharp': 'Rapide et précise', 'Papaya GP': 'Papaya GP', 'The fastest car here': 'La plus rapide',
+ 'Azure': 'Azur', 'Rally': 'Rallye', 'Mamba': 'Mamba', 'Violet': 'Violet', 'Ghost': 'Fantôme', 'Onyx': 'Onyx', 'Flamingo': 'Flamant',
+ 'Engine': 'Moteur', 'Higher top speed': 'Vitesse max plus haute', '+{0}% top speed': '+{0}% vitesse max', 'Lasts longer, refills faster': 'Dure plus, se recharge plus vite', '-{0}% burn, +{1}% refill': '-{0}% conso, +{1}% recharge',
+ 'Sharper steering': 'Direction plus vive', '+{0}% steering': '+{0}% direction', 'Grip': 'Adhérence', 'Less slowdown off road and in crashes': 'Moins de ralentissement hors piste et en cas de choc', '-{0}% off-road drag': '-{0}% de freinage hors piste',
+ /* awards */
+ 'First Win': 'Première victoire', 'Win a race': 'Gagne une course', 'Champion': 'Champion', 'Win 5 races': 'Gagne 5 courses', 'Veteran': 'Vétéran', 'Finish 10 races': 'Termine 10 courses',
+ 'Clean Driver': 'Pilote propre', 'Finish a race without a crash': 'Termine une course sans choc', 'Turbo Addict': 'Accro au turbo', 'Burn turbo for 15 s in one race': 'Utilise le turbo 15 s en une course',
+ 'Speed Demon': 'Démon de vitesse', 'Reach 300 km/h': 'Atteins 300 km/h', 'Hard Podium': 'Podium difficile', 'Finish top 3 on Hard': 'Finis dans les 3 premiers en Difficile',
+ 'Globetrotter': 'Globe-trotter', 'Race on every circuit': 'Cours sur chaque circuit', 'Night Owl': 'Oiseau de nuit', 'Win a race on the Night track': 'Gagne une course sur le circuit de nuit',
+ 'Collector': 'Collectionneur', 'Own 4 paints': 'Possède 4 peintures', 'Fully Tuned': 'Entièrement réglée', 'Max out any upgrade': 'Monte une amélioration au max',
+ 'Pit Lane': 'Voie des stands', 'Buy an F1 car': 'Achète une F1', 'Rain Master': 'Maître de la pluie', 'Win a race on the Rainforest track': 'Gagne une course en forêt tropicale', 'Explorer': 'Explorateur', 'Unlock every circuit': 'Débloque tous les circuits'
+},
+ar: {
+ 'Created by': 'من تطوير', 'Loading': 'جارٍ التحميل',
+ '11 cars, 6 circuits. Win coins, buy F1 cars, unlock every track.': '11 سيارة و6 حلبات. اربح العملات واشترِ سيارات F1 وافتح كل الحلبات.',
+ '{0} races, {1} wins': '{0} سباقات، {1} انتصارات', 'Circuit': 'الحلبة', 'Difficulty': 'الصعوبة', 'Laps': 'اللفات', 'Easy': 'سهل', 'Normal': 'عادي', 'Hard': 'صعب',
+ 'Best race time': 'أفضل وقت', 'Pays': 'المكافأة', 'up to {0} coins': 'حتى {0} عملة', 'Race': 'ابدأ السباق', 'Garage': 'المرآب', 'Awards': 'الجوائز', 'Settings': 'الإعدادات', 'Zones': 'المناطق',
+ 'Paused': 'متوقف', 'Resume': 'متابعة', 'Restart': 'إعادة', 'Quit to menu': 'خروج للقائمة', 'PAUSE': 'إيقاف',
+ 'You won': 'ربحت!', 'Podium finish, {0}': 'على المنصة، {0}', 'Finished {0}': 'أنهيت في {0}', '+{0} coins': '+{0} عملة',
+ 'New best time on {0}, {1} laps': 'رقم قياسي جديد في {0}، {1} لفات', 'Your time {0}': 'وقتك {0}', 'best lap {0}': 'أفضل لفة {0}', 'Full results': 'كل النتائج', 'racing': 'في السباق', 'Race again': 'سباق جديد', 'Menu': 'القائمة', 'Back': 'رجوع',
+ 'Each award pays coins the first time you earn it.': 'كل جائزة تعطيك عملات أول مرة تحصل عليها.', 'Done': 'تم',
+ 'Easy: slower rivals, forgiving crashes': 'سهل: خصوم أبطأ وتصادم متسامح', 'Camera': 'الكاميرا', 'Switch in a race with C on a keyboard': 'غيّرها أثناء السباق بزر C في الكيبورد', 'Chase': 'خلفية', 'High': 'عالية', 'Cockpit': 'قمرة القيادة',
+ 'Auto gas': 'بنزين تلقائي', 'Off adds a GAS button': 'عند الإيقاف يظهر زر البنزين', 'Steering': 'التوجيه', 'Soft': 'ناعم', 'Sharp': 'حاد', 'Button size': 'حجم الأزرار', 'Small': 'صغير', 'Medium': 'متوسط', 'Large': 'كبير',
+ 'Graphics': 'الرسومات', 'Lower it if the game stutters': 'خفّضها إذا كانت اللعبة تتقطع', 'Low': 'منخفضة', 'Music': 'الموسيقى', 'Sound effects': 'المؤثرات الصوتية', 'Vibration': 'الاهتزاز', 'On crashes, where the phone allows it': 'عند الاصطدام إذا سمح الهاتف',
+ 'Rear-view mirror': 'مرآة خلفية', 'Shows cars behind you': 'تُظهر السيارات التي وراءك', 'On': 'تشغيل', 'Off': 'إيقاف', 'Fullscreen': 'ملء الشاشة', 'Reset progress': 'مسح التقدم', 'Tap again to erase': 'اضغط مرة أخرى للمسح', 'Language': 'اللغة',
+ 'Upgrades': 'التطويرات', 'Paint': 'الألوان', 'Cars': 'السيارات', 'Circuits': 'الحلبات', 'level {0}/{1}': 'المستوى {0}/{1}', '{0}. Now {1}': '{0}. الآن {1}', 'Maxed': 'أقصى', '{0} coins': '{0} عملة', 'Equipped': 'مُستخدمة', 'Equip': 'استخدم',
+ 'Select': 'اختر', 'Selected': 'مختارة', 'Unlock for {0} coins': 'افتح بـ {0} عملة', 'Speed': 'السرعة', 'Accel': 'التسارع', 'Handling': 'التحكم', 'pays x{0}': 'مكافأة x{0}',
+ 'Win races to earn coins. Harder levels and later circuits pay more.': 'اربح السباقات لتجمع العملات. المستويات الصعبة والحلبات المتقدمة تعطي أكثر.', '{0} is locked': '{0} مقفلة',
+ '{0} unlocked': 'تم فتح {0}', '{0} bought': 'تم شراء {0}', '{0} level {1}': '{0} مستوى {1}', 'Fullscreen is not available here': 'ملء الشاشة غير متاح هنا', 'Progress erased': 'تم مسح التقدم', 'Achievement: {0}  +{1}': 'جائزة: {0}  +{1}',
+ 'LAP': 'لفة', 'POS': 'المركز', 'km/h': 'كم/س', 'TURBO': 'تيربو', 'BRAKE': 'فرامل', 'GAS': 'بنزين', 'CRASH!': 'اصطدام!', 'OFF ROAD': 'خارج الطريق', 'GO!': 'انطلق!', 'YOU': 'أنت',
+ 'Steer left': 'يسار', 'Steer right': 'يمين',
+ 'Coast': 'الساحل', 'Sunny seaside road': 'طريق مشمس على البحر', 'Seaside': 'شاطئ البحر', 'Marina': 'المرسى', 'Cliffs': 'المنحدرات',
+ 'Sahara': 'الصحراء', 'Long straights, big dunes': 'طرق مستقيمة طويلة وكثبان كبيرة', 'Dunes': 'الكثبان', 'Oasis': 'الواحة', 'Salt Flats': 'السباخ',
+ 'Alps': 'جبال الألب', 'Snow, tight corners, steep hills': 'ثلج ومنعطفات ضيقة وتلال شديدة', 'Pine Valley': 'وادي الصنوبر', 'Mountain Tunnel': 'نفق الجبل', 'Summit': 'القمة',
+ 'Night': 'الليل', 'Dark road, headlights on': 'طريق مظلم والأضواء مشغلة', 'Highway': 'الطريق السريع', 'Harbor Tunnel': 'نفق الميناء', 'Skyline': 'أفق المدينة',
+ 'Canyon': 'الوادي', 'Fast bends between red mesas': 'منعطفات سريعة بين هضاب حمراء', 'Mesa Pass': 'ممر الهضاب', 'Sunset Rim': 'حافة الغروب',
+ 'Rainforest': 'الغابة المطيرة', 'Wet road and thick jungle': 'طريق مبلل وغابة كثيفة', 'Jungle': 'الغابة', 'Riverside': 'ضفة النهر', 'Paddock': 'منطقة الفرق',
+ 'Street GT': 'سيارة الشارع GT', 'Balanced and forgiving': 'متوازنة وسهلة', 'Apex F1': 'أبيكس F1', 'Quick off the line': 'سريعة الانطلاق', 'Silver Arrow': 'السهم الفضي', 'Fast and sharp': 'سريعة ودقيقة', 'Papaya GP': 'بابايا GP', 'The fastest car here': 'الأسرع هنا',
+ 'Azure': 'أزرق', 'Rally': 'أحمر رالي', 'Mamba': 'مامبا', 'Violet': 'بنفسجي', 'Ghost': 'شبح', 'Onyx': 'أونيكس', 'Flamingo': 'فلامنغو',
+ 'Engine': 'المحرك', 'Higher top speed': 'سرعة قصوى أعلى', '+{0}% top speed': '+{0}% سرعة قصوى', 'Lasts longer, refills faster': 'يدوم أكثر ويتعبأ أسرع', '-{0}% burn, +{1}% refill': '-{0}% استهلاك، +{1}% تعبئة',
+ 'Sharper steering': 'توجيه أدق', '+{0}% steering': '+{0}% توجيه', 'Grip': 'الثبات', 'Less slowdown off road and in crashes': 'تباطؤ أقل خارج الطريق وعند الاصطدام', '-{0}% off-road drag': '-{0}% تباطؤ خارج الطريق',
+ 'First Win': 'أول فوز', 'Win a race': 'اربح سباقاً', 'Champion': 'بطل', 'Win 5 races': 'اربح 5 سباقات', 'Veteran': 'محترف قديم', 'Finish 10 races': 'أنهِ 10 سباقات',
+ 'Clean Driver': 'سائق نظيف', 'Finish a race without a crash': 'أنهِ سباقاً بدون اصطدام', 'Turbo Addict': 'مدمن تيربو', 'Burn turbo for 15 s in one race': 'استعمل التيربو 15 ثانية في سباق',
+ 'Speed Demon': 'شيطان السرعة', 'Reach 300 km/h': 'وصل إلى 300 كم/س', 'Hard Podium': 'منصة صعبة', 'Finish top 3 on Hard': 'ادخل أول 3 في الصعب',
+ 'Globetrotter': 'جوّال', 'Race on every circuit': 'تسابق في كل الحلبات', 'Night Owl': 'بومة الليل', 'Win a race on the Night track': 'اربح سباقاً في حلبة الليل',
+ 'Collector': 'جامع', 'Own 4 paints': 'امتلك 4 ألوان', 'Fully Tuned': 'مطوّرة بالكامل', 'Max out any upgrade': 'أوصل أي تطوير للحد الأقصى',
+ 'Pit Lane': 'ممر الصيانة', 'Buy an F1 car': 'اشترِ سيارة F1', 'Rain Master': 'سيد المطر', 'Win a race on the Rainforest track': 'اربح سباقاً في الغابة المطيرة', 'Explorer': 'مستكشف', 'Unlock every circuit': 'افتح كل الحلبات'
+}};
+
+Object.assign(I18N.fr, { 'Turbo': 'Turbo', 'Free': 'Gratuit', 'Now {0}': 'Actuel : {0}', 'Zones: {0}': 'Zones : {0}', 'Secret code': 'Code secret', 'Enter code': 'Saisis le code', 'Apply': 'Valider',
+  'Code accepted: everything is free': 'Code accepté : tout est gratuit', 'Wrong code': 'Code incorrect', 'Everything is free': 'Tout est gratuit' });
+Object.assign(I18N.ar, { 'Turbo': 'تيربو', 'Free': 'مجاني', 'Now {0}': 'الحالي: {0}', 'Zones: {0}': 'المناطق: {0}', 'Secret code': 'كود سري', 'Enter code': 'اكتب الكود', 'Apply': 'تفعيل',
+  'Code accepted: everything is free': 'تم قبول الكود: كل شيء مجاني', 'Wrong code': 'الكود غير صحيح', 'Everything is free': 'كل شيء مجاني' });
+const curLang = () => (save && save.set && save.set.lang) || 'en';
+function tr(s, ...a) {
+  const d = I18N[curLang()]; let r = (d && d[s]) || s;
+  return a.length ? r.replace(/\{(\d+)\}/g, (m, i) => a[i]) : r;
+}
+function ordn(n) {
+  const l = curLang();
+  if (l === 'fr') return n === 1 ? '1er' : n + 'e';
+  if (l === 'ar') return String(n);
+  return n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+}
+const dn = r => r.me ? tr('YOU') : r.name;
+function pickLang() {
+  if (save.set.lang) return;
+  const nl = (navigator.language || 'en').slice(0, 2).toLowerCase();
+  save.set.lang = nl === 'ar' || nl === 'fr' ? nl : 'en';
+}
+function applyLang() {
+  const l = curLang(), app = document.getElementById('app');
+  document.documentElement.lang = l; scr.dir = l === 'ar' ? 'rtl' : 'ltr';
+  document.body.classList.toggle('ar', l === 'ar');
+  document.getElementById('pauseBtn').textContent = tr('PAUSE');
+  document.getElementById('bBrake').textContent = tr('BRAKE'); document.getElementById('bTurbo').textContent = tr('TURBO'); document.getElementById('bGas').textContent = tr('GAS');
+  document.getElementById('bL').setAttribute('aria-label', tr('Steer left')); document.getElementById('bR').setAttribute('aria-label', tr('Steer right'));
+  document.getElementById('spBy').firstChild.textContent = tr('Created by') + ' ';
+}
+
+/* ================= game state ================= */
+let state = 'menu';                 // menu | countdown | play | paused | finished
+let racers = [], player = null, D = DIFFICULTY.EASY, laps = 2;
+const WALL = 1.0; let wallT = 0;
+let position = 0, playerX = 0, speed = 0, lapsDone = 0, lapTime = 0, raceTime = 0;
+let crashTimer = 0, bgScroll = 0, turbo = 100, turboOn = false, wheel = 0, count = 3, goFlash = 0;
+let bestLap = null, camIdx = 0, reward = 0, lastRank = 0, newBest = false, achTimer = 0;
+let zoneName = '', zoneBanner = 0;
+const fx = { crash: false };
+const inp = { left: false, right: false, gas: false, brake: false, turbo: false };
+const keys = new Set();
+
+const up = id => save.up[id] || 0;
+const topSpeed = () => MAX_SPEED * (1 + 0.04 * up('engine')) * curCar().top;
+const turboMax = () => topSpeed() * 1.3;
+
+function makeRacers(grid) {
+  racers = [];
+  const car = curCar();
+  player = { name: 'YOU', color: paintColor(), kind: car.kind, accent: car.accent, prog: 0, offset: playerX, speed: 0, base: 0, pref: 0, finish: null, me: true };
+  racers.push(player);
+  const cols = [-0.55, 0, 0.55];
+  for (let i = 0; i < 10; i++) {
+    const row = Math.floor(i / 3), r = {
+      name: AI_NAMES[i], color: AI_COLORS[i], kind: car.kind, accent: car.kind === 'f1' ? '#f5f5f5' : null, me: false, finish: null, speed: 0,
+      prog: grid ? (4 - row) * 650 : rnd(2000, TRACK_LEN - 3000), offset: cols[i % 3],
+      base: MAX_SPEED * rnd(D.ai[0], D.ai[1]) * (car.kind === 'f1' ? 1.05 : 1), pref: cols[i % 3]
+    };
+    racers.push(r);
+  }
+}
+function resetRace() {
+  loadTrack(save.set.track); Object.assign(run, { crashes: 0, turbo: 0, maxKmh: 0, done: false });
+  D = DIFFICULTY[save.set.level]; laps = save.set.laps; camIdx = save.set.cam;
+  position = 0; playerX = Math.random() < 0.5 ? 0 : 0.55; speed = 0; lapsDone = 0; lapTime = 0; raceTime = 0;
+  crashTimer = 0; turbo = 100; turboOn = false; wheel = 0; goFlash = 0; bestLap = null; reward = 0; newBest = false; zoneBanner = 0; achTimer = 0;
+  makeRacers(true);
+}
+function startRace() { resetRace(); audioInit(); state = 'countdown'; count = 3; lastBeep = 4; showScreen(null); setPlayUI(true); }
+function enterMenu() {
+  state = 'menu'; loadTrack(save.set.track); D = DIFFICULTY[save.set.level]; position = 0; playerX = 0; speed = MAX_SPEED * 0.55; camIdx = 0;
+  makeRacers(false); player.prog = 0; setPlayUI(false); showScreen('home');
+}
+function standings() {
+  const fin = racers.filter(r => r.finish !== null).sort((a, b) => a.finish - b.finish);
+  const rest = racers.filter(r => r.finish === null).sort((a, b) => b.prog - a.prog);
+  return fin.concat(rest);
+}
+
+/* ================= update ================= */
+function update(dt) {
+  if (state === 'paused') return;
+  if (state === 'menu') return updateDemo(dt);
+  if (state === 'countdown') {
+    count -= dt; const n = Math.ceil(count);
+    if (n !== lastBeep && n >= 1) { lastBeep = n; beep(520, 0.12); }
+    if (count <= 0) { state = 'play'; goFlash = 1; beep(880, 0.35); zoneName = zoneAt(0).name; zoneBanner = 2.6; }
+    return;
+  }
+  goFlash = Math.max(0, goFlash - dt); raceTime += dt; zoneBanner = Math.max(0, zoneBanner - dt);
+  if (state === 'play') updatePlayer(dt);
+  else {   // finished: coast to a stop
+    speed = Math.max(0, speed - MAX_SPEED * 0.25 * dt);
+    position = (position + speed * dt) % TRACK_LEN; player.prog += speed * dt; turboOn = false;
+  }
+  player.offset = playerX; player.speed = speed;
+  for (const r of racers) if (!r.me) updateAI(r, dt);
+  checkCollisions(); engineSound();
+}
+function updateDemo(dt) {
+  const seg = findSeg(position + CAR_Z);
+  position = (position + speed * dt) % TRACK_LEN; player.prog = position;
+  playerX += (clamp(-seg.curve * 0.08, -0.5, 0.5) - playerX) * Math.min(1, 1.5 * dt);
+  bgScroll += seg.curve * (speed / MAX_SPEED) * dt * 90;
+  player.offset = playerX; player.speed = speed;
+  for (const r of racers) if (!r.me) { updateAI(r, dt); r.finish = null; }
+}
+function steerInput() {
+  return ((inp.right || keys.has('arrowright') || keys.has('d')) ? 1 : 0) - ((inp.left || keys.has('arrowleft') || keys.has('a')) ? 1 : 0);
+}
+function updatePlayer(dt) {
+  lapTime += dt; crashTimer = Math.max(0, crashTimer - dt);
+  const pseg = findSeg(position + CAR_Z), sp = speed / MAX_SPEED;
+  const baseSteer = 2 * dt * sp * LAT;
+  const steer = baseSteer * D.steer * (1 + 0.06 * up('handling')) * save.set.steer * curCar().hnd;
+  const si = steerInput();
+  wheel += (si * 0.7 - wheel) * Math.min(1, 10 * dt);
+  playerX += steer * si;
+  playerX -= baseSteer * sp * pseg.curve * D.centrifugal;
+
+  const brake = inp.brake || keys.has('arrowdown') || keys.has('s');
+  const gas = !brake && (inp.gas || keys.has('arrowup') || keys.has('w') || save.set.autoGas);
+  turboOn = gas && (inp.turbo || keys.has('t') || keys.has('shift')) && turbo > 0;
+  let accel = ACCEL * curCar().acc;
+  if (turboOn) { accel *= TURBO_ACCEL_MULT; turbo = Math.max(0, turbo - TURBO_DRAIN / (1 + 0.15 * up('turbo')) * dt); }
+  else turbo = Math.min(100, turbo + TURBO_RECHARGE * (1 + 0.2 * up('turbo')) * dt);
+  const top = topSpeed();
+  if (gas) { if (turboOn || speed < top) speed += accel * dt; }
+  else if (brake) speed += BRAKE * dt;
+  else speed += DECEL * dt;
+  if (Math.abs(playerX) > 1 && speed > OFFROAD_LIMIT) speed += OFFROAD_DECEL * D.offroad * (1 - 0.15 * up('grip')) * dt;
+  if (!turboOn && speed > top) speed = Math.max(top, speed - MAX_SPEED * 0.6 * dt);
+  /* guard rails: the car cannot leave the road, it scrapes along the wall and loses speed */
+  wallT = Math.max(0, wallT - dt);
+  if (Math.abs(playerX) > WALL) {
+    const sd = Math.sign(playerX), hit = (Math.abs(playerX) - WALL) + (si * sd > 0.2 ? 0.05 : 0);
+    playerX = sd * WALL; speed -= speed * 0.55 * dt * (0.5 + Math.min(1, hit * 8));
+    if (sp > 0.1) {
+      for (let i = 0; i < 2; i++) emit(fxPX + sd * fxPW * 0.46, fxPY - 4 * S, -sd * rnd(20, 90) * S, rnd(-120, -30) * S, rnd(0.25, 0.5), SPARK[(Math.random() * 3) | 0], rnd(1.5, 3) * S, 380 * S);
+      if (wallT <= 0) { wallT = 0.14; if (save.set.sfx && actx) { try { drum(actx.currentTime, 2500, 0.12, 0.18, sfxBus); } catch (e) {} } buzz(12); }
+    }
+  }
+  playerX = clamp(playerX, -2, 2); speed = clamp(speed, 0, turboMax());
+  if (turboOn) run.turbo += dt;
+  run.maxKmh = Math.max(run.maxKmh, speed / MAX_SPEED * 260);
+  achTimer += dt; if (achTimer > 1) { achTimer = 0; checkAch(); }
+  position += speed * dt; bgScroll += pseg.curve * sp * dt * 90;
+  const zn = zoneAt(position).name; if (zn !== zoneName) { zoneName = zn; zoneBanner = 2.6; }
+  if (position >= TRACK_LEN) {
+    position -= TRACK_LEN; lapsDone++;
+    if (bestLap === null || lapTime < bestLap) bestLap = lapTime;
+    lapTime = 0;
+    if (lapsDone >= laps) { player.finish = raceTime; finishRace(); }
+  }
+  player.prog = lapsDone * TRACK_LEN + position;
+}
+function updateAI(r, dt) {
+  const seg = findSeg(r.prog + CAR_Z);
+  let target = r.base * (1 - 0.03 * Math.abs(seg.curve));
+  if (!inRaceDemo()) { /* demo: no rubber banding */ }
+  else {
+    const diff = r.prog - player.prog;
+    if (diff > 6000) target *= D.aheadSlow; else if (diff < -6000) target *= D.behindBoost;
+  }
+  if (Math.random() < dt * 0.3) r.pref = clamp(r.pref + rnd(-0.25, 0.25), -0.8, 0.8);
+  let tOff = r.pref; const gap = CAR_FRAC * 1.15;
+  for (const o of racers) {
+    if (o === r) continue;
+    const dz = wrapD(o.prog - r.prog);
+    if (dz > 0 && dz < 900 && Math.abs(o.offset - r.offset) < gap && r.speed > o.speed + 50) {
+      if (dz < 400) target = Math.min(target, o.speed);
+      const side = r.offset >= o.offset ? 1 : -1;
+      let to = o.offset + side * CAR_FRAC * 1.6;
+      if (Math.abs(to) > 0.9) to = o.offset - side * CAR_FRAC * 1.6;
+      tOff = clamp(to, -0.9, 0.9); break;
+    }
+  }
+  r.offset += clamp(tOff - r.offset, -0.6 * dt, 0.6 * dt);
+  r.speed += (target - r.speed) * Math.min(1, 1.2 * dt);
+  r.prog += r.speed * dt;
+  if (r.finish === null && state !== 'menu' && r.prog >= laps * TRACK_LEN) r.finish = raceTime;
+}
+const inRaceDemo = () => state !== 'menu';
+function checkCollisions() {
+  if (state !== 'play') return;
+  for (const r of racers) {
+    if (r.me) continue;
+    const dz = wrapD(r.prog - player.prog);
+    if (speed > r.speed && dz > -150 && dz < 300 && Math.abs(playerX - r.offset) < CAR_FRAC) {
+      speed = r.speed * clamp(D.crash + 0.04 * up('grip'), 0, 0.95);
+      if (crashTimer <= 0) { buzz(60); crashSound(); run.crashes++; fx.crash = true; }
+      crashTimer = 0.8;
+    }
+  }
+}
+function finishRace() {
+  state = 'finished';
+  const order = standings(); lastRank = order.indexOf(player) + 1;
+  reward = Math.max(15, Math.round(PAY[lastRank - 1] * D.pay * T.pay * laps / 3));
+  save.coins += reward; save.races++; if (lastRank === 1) save.wins++;
+  const key = trackId + ':' + save.set.level + ':' + laps, prev = save.best[key];
+  if (prev === undefined || player.finish < prev) { save.best[key] = player.finish; newBest = prev !== undefined; }
+  if (!save.raced.includes(trackId)) save.raced.push(trackId);
+  run.done = true; checkAch();
+  persist(); beep(lastRank === 1 ? 990 : 440, 0.5); setPlayUI(false);
+  setTimeout(() => { if (state === 'finished') showScreen('result'); }, 900);
+}
+
+/* ================= input wiring ================= */
+function bindHold(el, flag) {
+  const on = e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} inp[flag] = true; el.classList.add('on'); };
+  const off = e => { e.preventDefault(); inp[flag] = false; el.classList.remove('on'); };
+  el.addEventListener('pointerdown', on);
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => el.addEventListener(t, off));
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+window.addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase(); keys.add(k);
+  if (k === 'c' && (state === 'play' || state === 'countdown')) camIdx = (camIdx + 1) % CAMERAS.length;
+  if (k === 'p' || k === 'escape') togglePause();
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => { keys.clear(); for (const k in inp) inp[k] = false; if (state === 'play') togglePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
+function togglePause() {
+  if (state === 'play') { state = 'paused'; persist(); showScreen('pause'); }
+  else if (state === 'paused') { state = 'play'; showScreen(null); }
+}
+
+/* ================= achievements ================= */
+function checkAch() {
+  let got = false;
+  for (const a of ACH) {
+    if (!save.ach[a.id] && a.test()) {
+      save.ach[a.id] = true; save.coins += a.coins; got = true;
+      flash(tr('Achievement: {0}  +{1}', tr(a.name), a.coins)); chime();
+    }
+  }
+  if (got) persist();
+}
+
+/* ================= sound, music & haptics ================= */
+let actx = null, master = null, sfxBus = null, musicBus = null, engGain = null, engLp = null;
+let eng = null, eng2 = null, whine = null, whineGain = null, noiseBuf = null, nextT = 0, stepI = 0, lastBeep = 4;
+const BPM = 124, STEPDUR = 60 / BPM / 4;
+const CHORDS = [[110, [1, 1.189, 1.498]], [87.31, [1, 1.26, 1.498]], [130.81, [1, 1.26, 1.498]], [98, [1, 1.26, 1.498]]];
+function mkOsc(type) { const o = actx.createOscillator(); o.type = type; o.start(); return o; }
+function audioInit() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain(); master.gain.value = 0.9; master.connect(actx.destination);
+    sfxBus = actx.createGain(); musicBus = actx.createGain(); sfxBus.connect(master); musicBus.connect(master);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    engGain = actx.createGain(); engGain.gain.value = 0;
+    engLp = actx.createBiquadFilter(); engLp.type = 'lowpass'; engLp.frequency.value = 600;
+    eng = mkOsc('sawtooth'); eng2 = mkOsc('square'); eng.connect(engLp); eng2.connect(engLp); engLp.connect(engGain); engGain.connect(sfxBus);
+    whine = mkOsc('triangle'); whineGain = actx.createGain(); whineGain.gain.value = 0; whine.connect(whineGain); whineGain.connect(sfxBus);
+    nextT = actx.currentTime + 0.1; stepI = 0;
+    setInterval(musicTick, 30);
+  } catch (e) { actx = null; }
+}
+function updateMix() { try { updateMix0(); } catch (e) {} }
+function updateMix0() {
+  if (!actx) return;
+  const now = actx.currentTime;
+  if (state !== 'play' && engGain) { engGain.gain.setTargetAtTime(0, now, 0.05); whineGain.gain.setTargetAtTime(0, now, 0.05); }
+  const m = state === 'paused' ? 0.2 : state === 'menu' ? 0.55 : 1;
+  musicBus.gain.setTargetAtTime(save.set.music ? m * 0.45 : 0, now, 0.15);
+  sfxBus.gain.setTargetAtTime(save.set.sfx ? 1 : 0, now, 0.05);
+}
+function engineSound() { try { engineSound0(); } catch (e) {} }
+function engineSound0() {
+  if (!actx || !eng) return;
+  const now = actx.currentTime, sp = speed / MAX_SPEED, on = state === 'play';
+  const gear = Math.min(4, Math.floor(sp * 5)), rpm = (sp * 5) % 1;          // five "gears": pitch climbs then drops
+  const f = 52 + rpm * 78 + gear * 12;
+  eng.frequency.setTargetAtTime(f, now, 0.04); eng2.frequency.setTargetAtTime(f * 0.5, now, 0.04);
+  engLp.frequency.setTargetAtTime(380 + sp * 900, now, 0.08);
+  engGain.gain.setTargetAtTime(on ? 0.03 + 0.045 * Math.min(1.3, sp) : 0, now, 0.06);
+  whine.frequency.setTargetAtTime(900 + sp * 600, now, 0.05);
+  whineGain.gain.setTargetAtTime(on && turboOn ? 0.014 : 0, now, 0.05);
+}
+function tone(type, freq, t, dur, vol, lp) {
+  const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  let out = o; if (lp) { const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); out = f; }
+  out.connect(g); g.connect(musicBus); o.start(t); o.stop(t + dur + 0.02);
+}
+function drum(t, hp, dur, vol, bus) {
+  const n = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+  n.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = hp;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  n.connect(f); f.connect(g); g.connect(bus || musicBus); n.start(t); n.stop(t + dur + 0.02);
+}
+function kick(t) {
+  const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+  g.gain.setValueAtTime(0.6, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.2);
+}
+function musicTick() { try { musicTick0(); } catch (e) {} }
+function musicTick0() {
+  if (!actx || actx.state !== 'running') return;
+  if (nextT < actx.currentTime - 0.3) nextT = actx.currentTime + 0.05;
+  while (nextT < actx.currentTime + 0.15) { playStep(stepI++, nextT); nextT += STEPDUR; }
+}
+function playStep(i, t) {
+  const racing = state === 'play' || state === 'countdown', bar = Math.floor(i / 16) % 4, s = i % 16;
+  const [root, tri] = CHORDS[bar];
+  if (racing) {
+    if (s % 4 === 0) kick(t);
+    if (s === 4 || s === 12) drum(t, 1800, 0.1, 0.12);
+    if (s % 2 === 0) drum(t, 7000, 0.04, 0.05);
+    if ([0, 3, 6, 8, 11, 14].includes(s)) tone('sawtooth', root, t, 0.2, 0.17, 420);
+    tone('square', root * 4 * tri[[0, 1, 2, 1][s % 4]], t, 0.09, 0.03, 2600);
+  } else {
+    if (s === 0) for (const r of tri) tone('triangle', root * 2 * r, t, STEPDUR * 15, 0.05, 1800);
+    if (s === 0 || s === 8) tone('sawtooth', root, t, 0.5, 0.12, 300);
+    if (s % 4 === 2 && bar % 2 === 1) tone('sine', root * 4 * tri[(s >> 2) % 3], t, 0.3, 0.04);
+  }
+}
+function beep(freq, dur, type) {
+  if (!save.set.sfx) return; audioInit(); if (!actx) return;
+  try {
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq; g.gain.setValueAtTime(0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+function chime() { [660, 880, 1320].forEach((f, i) => setTimeout(() => beep(f, 0.22), i * 90)); }
+function crashSound() {
+  if (!save.set.sfx) return; audioInit(); if (!actx) return;
+  try { drum(actx.currentTime, 300, 0.3, 0.3, sfxBus); beep(90, 0.25, 'square'); } catch (e) {}
+}
+function buzz(ms) { if (save.set.vibrate && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} } }
+document.addEventListener('visibilitychange', () => { if (!actx) return; if (document.hidden) actx.suspend(); else actx.resume(); });
+
+/* ================= canvas & layout ================= */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 640, H = 360, S = 1, WE = 480, YS = 180, hy = 150, carY = 340, drawN = 70;
+const QUALITY = [0.55, 0.75, 1];
+function resize() {
+  W = Math.max(200, cv.clientWidth); H = Math.max(200, cv.clientHeight);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2) * QUALITY[save.set.quality];
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  S = Math.max(0.9, Math.min(W / 640, H / 480));
+  WE = Math.min(W, H * 4 / 3);
+  const portrait = H > W, units = save.set.autoGas ? 4.3 : 5.45;
+  const cb = Math.min(84 * save.set.ctrl * (portrait ? 1 : 0.92), (W - 28 - 40) / units);
+  document.getElementById('touch').style.setProperty('--cb', cb + 'px');
+  carY = portrait ? H - (cb + 36) : H - 14 * S;
+  YS = Math.max(WE * 0.375, Math.min(H * 0.42, WE * 0.9));
+  hy = carY - YS;
+  drawN = QUALITY[save.set.quality] < 0.7 ? 55 : 75;
+}
+window.addEventListener('resize', resize);
+
+/* ================= drawing helpers ================= */
+const rect = (x0, y0, x1, y1, f) => { ctx.fillStyle = f; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); };
+function poly(f, ...p) { ctx.fillStyle = f; ctx.beginPath(); ctx.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]); ctx.closePath(); ctx.fill(); }
+function oval(cx, cy, rx, ry, f) { ctx.fillStyle = f; ctx.beginPath(); ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, 6.2832); ctx.fill(); }
+function tx(s, x, y, size, color, align, weight) {
+  ctx.font = (weight || 700) + ' ' + size + 'px "Chakra Petch","Cairo",Arial,sans-serif';
+  ctx.fillStyle = color || '#fff'; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function strokeRect(x, y, w, h, c, lw) { ctx.strokeStyle = c; ctx.lineWidth = lw || 1; ctx.strokeRect(x, y, w, h); }
+
+function drawCar(c, cx, by, w, color, kind, accent) { if (kind === 'f1') drawF1(c, cx, by, w, color, accent); else drawGT(c, cx, by, w, color); }
+function drawGT(c, cx, by, w, color) {
+  if (w < 2) return;
+  const R = (x0, y0, x1, y1, f) => { c.fillStyle = f; c.fillRect(x0, y0, x1 - x0, y1 - y0); };
+  const P = (f, ...p) => { c.fillStyle = f; c.beginPath(); c.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]); c.closePath(); c.fill(); };
+  c.fillStyle = '#1b1b1b'; c.beginPath(); c.ellipse(cx, by, 0.55 * w, 0.06 * w, 0, 0, 6.2832); c.fill();
+  for (const sx of [-1, 1]) { const x0 = cx + sx * 0.5 * w; R(x0 - 0.09 * w, by - 0.28 * w, x0 + 0.09 * w, by, '#111'); }
+  R(cx - 0.5 * w, by - 0.5 * w, cx + 0.5 * w, by - 0.1 * w, color);
+  P(color, cx - 0.38 * w, by - 0.5 * w, cx - 0.27 * w, by - 0.78 * w, cx + 0.27 * w, by - 0.78 * w, cx + 0.38 * w, by - 0.5 * w);
+  P('#81d4fa', cx - 0.31 * w, by - 0.52 * w, cx - 0.23 * w, by - 0.72 * w, cx + 0.23 * w, by - 0.72 * w, cx + 0.31 * w, by - 0.52 * w);
+  for (const sx of [-1, 1]) { const x0 = cx + sx * 0.36 * w; R(x0 - 0.12 * w, by - 0.42 * w, x0 + 0.12 * w, by - 0.3 * w, '#ff1744'); }
+  R(cx - 0.1 * w, by - 0.26 * w, cx + 0.1 * w, by - 0.16 * w, '#f5f5f5');
+}
+
+const STARS = Array.from({ length: 80 }, () => ({ x: Math.random(), y: Math.random() * 0.92, r: 0.6 + Math.random() * 1.2, ph: Math.random() * 6.28 }));
+const FLAKES = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), v: 40 + Math.random() * 60, r: 1 + Math.random() * 2, ph: Math.random() * 6.28 }));
+let frameDt = 0.016;
+function drawBackground() {
+  const tun = tunnelView(), stripe = hy / T.sky.length;
+  if (tun) rect(0, 0, W, hy, '#0b0c11'); else T.sky.forEach((col, i) => rect(0, i * stripe, W, (i + 1) * stripe + 1, col));
+  if (T.stars && !tun) {
+    const tm = performance.now() / 600;
+    for (const st of STARS) { ctx.globalAlpha = 0.45 + 0.4 * Math.sin(tm + st.ph); oval(st.x * W, st.y * hy, st.r * S, st.r * S, '#ffffff'); }
+    ctx.globalAlpha = 1;
+  }
+  const o = T.sun || T.moon;
+  if (o && !tun) {
+    const ox = W * o.x, oy = hy * o.y, rr = o.r * S;
+    ctx.globalAlpha = 0.22; oval(ox, oy, rr * 1.8, rr * 1.8, o.c); ctx.globalAlpha = 1;
+    oval(ox, oy, rr, rr, o.c);
+  }
+  if (!tun) {
+    if (T.city) drawSkyline();
+    else {
+      const kx = W / 640;
+      for (const [layer, color, f] of [[T.s2, T.m2, 0.5], [T.s1, T.m1, 1]]) {
+        const shift = -((bgScroll * f * kx) % W + W) % W;
+        for (let k = 0; k < 3; k++) {
+          const xo = shift + k * W, p = [];
+          for (const [x, dy] of layer) p.push(x * kx + xo, hy + dy * S);
+          poly(color, ...p);
+        }
+      }
+    }
+  }
+  rect(0, hy, W, H, tun ? TUNNEL_GROUND[0] : T.g1);
+}
+function drawSnow() {
+  const n = QUALITY[save.set.quality] < 0.7 ? 45 : FLAKES.length, tm = performance.now() / 1000;
+  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  for (let i = 0; i < n; i++) {
+    const f = FLAKES[i]; f.y += f.v * frameDt / H * (1 + speed / MAX_SPEED); if (f.y > 1) { f.y = -0.02; f.x = Math.random(); }
+    const x = (f.x * W + Math.sin(tm + f.ph) * 12 * S), y = f.y * H, r = f.r * S;
+    ctx.fillRect(x, y, r, r);
+  }
+}
+function drawHeadlights(px, py, pw) {
+  const g = ctx.createLinearGradient(0, py, 0, hy);
+  g.addColorStop(0, 'rgba(255,244,180,.30)'); g.addColorStop(1, 'rgba(255,244,180,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(px - 0.32 * pw, py - 0.45 * pw); ctx.lineTo(px + 0.32 * pw, py - 0.45 * pw);
+  ctx.lineTo(px + 0.11 * W + (px - W / 2), hy + 6); ctx.lineTo(px - 0.11 * W + (px - W / 2), hy + 6); ctx.closePath(); ctx.fill();
+}
+
+/* ================= main render ================= */
+function render() {
+  drawBackground();
+  const [camName, camH] = CAMERAS[camIdx], camBack = camH * CAM_DEPTH;
+  const camPos = ((position + CAR_Z - camBack) % TRACK_LEN + TRACK_LEN) % TRACK_LEN;
+  const base = segments[Math.floor(camPos / SEG_LEN) % NSEG], basePct = (camPos % SEG_LEN) / SEG_LEN;
+  const carZ = position + CAR_Z, pseg = findSeg(carZ);
+  const camY = camH + lerp(pseg.y1, pseg.y2, (carZ % SEG_LEN) / SEG_LEN);
+  let x = 0, dx = -(base.curve * basePct);
+  const vis = [];
+  for (let i = 0; i < drawN; i++) {
+    const seg = segments[(base.index + i) % NSEG], looped = seg.index < base.index;
+    const cz = camPos - (looped ? TRACK_LEN : 0), z1 = seg.z1 - cz, z2 = seg.z2 - cz;
+    if (z1 > CAM_DEPTH) {
+      const s1 = CAM_DEPTH / z1, s2 = CAM_DEPTH / z2;
+      const c1 = playerX * ROAD_W - x, c2 = playerX * ROAD_W - x - dx;
+      const sx1 = W / 2 - s1 * c1 * WE / 2, sx2 = W / 2 - s2 * c2 * WE / 2;
+      const sy1 = hy - s1 * (seg.y1 - camY) * YS, sy2 = hy - s2 * (seg.y2 - camY) * YS;
+      if (sy2 < sy1) vis.push([seg, sx1, sy1, s1 * ROAD_W * WE / 2, s1, sx2, sy2, s2 * ROAD_W * WE / 2, s2]);
+    }
+    x += dx; dx += seg.curve;
+  }
+  const bySeg = new Map();
+  for (const r of racers) if (!r.me) { const k = Math.floor(((r.prog + CAR_Z) % TRACK_LEN) / SEG_LEN) % NSEG; (bySeg.get(k) || bySeg.set(k, []).get(k)).push(r); }
+  for (let i = vis.length - 1; i >= 0; i--) {
+    const [seg, sx1, sy1, sw1, s1, sx2, sy2, sw2, s2] = vis[i];
+    const tz = T.zones[seg.zone].tunnel;
+    if (!seg.light) rect(0, sy2, W, sy1, tz ? TUNNEL_GROUND[1] : T.g2);
+    const r1 = sw1 / 6, r2 = sw2 / 6;
+    poly(seg.light ? T.rum1 : T.rum2, sx1 - sw1 - r1, sy1, sx1 + sw1 + r1, sy1, sx2 + sw2 + r2, sy2, sx2 - sw2 - r2, sy2);
+    poly(seg.index < 2 ? '#fff' : seg.light ? T.road1 : T.road2, sx1 - sw1, sy1, sx1 + sw1, sy1, sx2 + sw2, sy2, sx2 - sw2, sy2);
+    if (seg.light) {
+      const lw1 = sw1 * 2 / LANES, lw2 = sw2 * 2 / LANES, m1 = sw1 / 40, m2 = sw2 / 40;
+      for (let l = 1; l < LANES; l++) {
+        const lx1 = sx1 - sw1 + lw1 * l, lx2 = sx2 - sw2 + lw2 * l;
+        poly(T.lane, lx1 - m1 / 2, sy1, lx1 + m1 / 2, sy1, lx2 + m2 / 2, sy2, lx2 - m2 / 2, sy2);
+      }
+    }
+    if (T.wet) poly('rgba(220,235,255,.07)', sx1 - sw1, sy1, sx1 + sw1, sy1, sx2 + sw2, sy2, sx2 - sw2, sy2);
+    if (!tz) {            /* guard rails along both edges of the road */
+      const wk = 1.2, hh1 = s1 * 190 * YS, hh2 = s2 * 190 * YS, c = seg.light ? '#e8ebf2' : '#c62828';
+      for (const sd of [-1, 1]) {
+        const a1 = sx1 + sd * sw1 * wk, a2 = sx2 + sd * sw2 * wk;
+        poly(c, a1, sy1, a2, sy2, a2, sy2 - hh2, a1, sy1 - hh1);
+        poly('#9aa3b5', a1, sy1 - hh1 * 0.9, a2, sy2 - hh2 * 0.9, a2, sy2 - hh2, a1, sy1 - hh1);
+        poly('rgba(0,0,0,.28)', a1, sy1, a2, sy2, a2, sy2 - hh2 * 0.12, a1, sy1 - hh1 * 0.12);
+      }
+    }
+    if (tz) drawTunnelSeg(seg, sx1, sy1, sw1, s1, sx2, sy2, sw2, s2);
+    else if (seg.props) for (const p of seg.props) drawProp(p, sx1 + p.s * sw1 * (1.2 + p.o), sy1, s1);
+    const list = bySeg.get(seg.index);
+    if (list) for (const r of list) {
+      const pct = ((r.prog + CAR_Z) % SEG_LEN) / SEG_LEN, sc = lerp(s1, s2, pct);
+      drawCar(ctx, lerp(sx1, sx2, pct) + sc * r.offset * ROAD_W * WE / 2, lerp(sy1, sy2, pct), sc * CAR_W_WORLD * WE / 2, r.color, r.kind, r.accent);
+    }
+  }
+  drawFog();
+  const racing = state !== 'menu';
+  if (camName !== 'COCKPIT' || !racing) {
+    const pw = CAM_DEPTH / camBack * CAR_W_WORLD * WE / 2 * 0.82;
+    const bump = Math.abs(playerX) > 1 && speed > 1000 ? rnd(-3, 3) : 0, wob = crashTimer > 0 ? rnd(-4, 4) : 0;
+    const px = W / 2 + wob, py = carY + bump; fxPX = px; fxPY = py; fxPW = pw;
+    if (T.dark && racing) drawHeadlights(px, py, pw);
+    if (turboOn) for (const sx of [-1, 1]) {
+      const fx = px + sx * 0.3 * pw, fl = rnd(0.18, 0.3) * pw;
+      oval(fx, py - 0.1 * pw + fl / 2, 0.1 * pw, fl / 2, '#ff9100'); oval(fx, py - 0.1 * pw + fl * 0.3, 0.05 * pw, fl * 0.3, '#fff59d');
+    }
+    drawCar(ctx, px, py, pw, player.color, player.kind, player.accent);
+  }
+  if (turboOn) {
+    ctx.strokeStyle = 'rgba(225,245,254,.55)'; ctx.lineWidth = Math.max(1, 2 * S); ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const a = Math.random() * 6.2832, r0 = rnd(110, 200) * S, r1 = r0 + rnd(50, 150) * S, kx = (W / H) / (4 / 3) * 1.1;
+      ctx.moveTo(W / 2 + Math.cos(a) * r0 * kx, hy + Math.sin(a) * r0 * 0.8); ctx.lineTo(W / 2 + Math.cos(a) * r1 * kx, hy + Math.sin(a) * r1 * 0.8);
+    }
+    ctx.stroke();
+  }
+  if (T.snow) drawSnow();
+  drawFx();
+  if (camName === 'COCKPIT' && racing) drawCockpit();
+  if (racing && !(state === 'finished' && !scr.hidden)) { drawHud(camName); drawZoneBanner(); }
+  else tx('', 0, 0, 1);
+  if (state === 'countdown') tx(String(Math.max(1, Math.ceil(count))), W / 2, hy * 0.85, 110 * S, '#ffb300', 'center');
+  if (goFlash > 0 && state === 'play') tx(tr('GO!'), W / 2, hy * 0.85, 90 * S, '#69f0ae', 'center');
+}
+function drawCockpit() {
+  const cx = W / 2;
+  poly('#1565c0', cx - 170 * S, H - 92 * S, cx - 85 * S, H - 132 * S, cx + 85 * S, H - 132 * S, cx + 170 * S, H - 92 * S);
+  poly('#1c1c1c', 0, H, 0, H - 72 * S, cx - 190 * S, H - 96 * S, cx + 190 * S, H - 96 * S, W, H - 72 * S, W, H);
+  const wy = H - 22 * S, rad = 62 * S;
+  ctx.strokeStyle = '#050505'; ctx.lineWidth = 9 * S; ctx.beginPath(); ctx.arc(cx, wy, rad, 0, 6.2832); ctx.stroke();
+  ctx.lineWidth = 7 * S; ctx.beginPath();
+  for (const a0 of [0, Math.PI, Math.PI / 2]) { const a = a0 + wheel; ctx.moveTo(cx, wy); ctx.lineTo(cx + Math.cos(a) * rad, wy + Math.sin(a) * rad); }
+  ctx.stroke();
+}
+
+/* ================= HUD ================= */
+function drawHud(camName) {
+  const bar = 34 * S, order = standings(), rank = order.indexOf(player) + 1;
+  rect(0, 0, W, bar, 'rgba(0,0,0,.78)');
+  tx(tr('LAP') + ' ' + Math.min(lapsDone + 1, laps) + '/' + laps, 10 * S, bar / 2, 14 * S);
+  tx(tr('POS') + ' ' + rank + '/' + racers.length, 100 * S, bar / 2, 14 * S, rank === 1 ? '#ffeb3b' : '#fff');
+  const t = player.finish !== null ? player.finish : raceTime;
+  tx(fmtTime(t), W - 96 * S, bar / 2, 14 * S, '#ffeb3b', 'right');
+
+  // standings (left)
+  const rows = Math.min(order.length, 11), rh = 14 * S, sx = 6 * S, sy = bar + 6 * S;
+  rect(sx, sy, sx + 108 * S, sy + rows * rh + 6 * S, 'rgba(16,16,16,.72)');
+  order.slice(0, rows).forEach((r, i) => {
+    const y = sy + 3 * S + rh * (i + 0.5);
+    rect(sx + 5 * S, y - 4 * S, sx + 12 * S, y + 4 * S, r.color);
+    tx((i + 1) + ' ' + dn(r), sx + 17 * S, y, 10.5 * S, r.me ? '#ffeb3b' : '#fff');
+  });
+
+  // minimap (right)
+  const mw = 132 * S, pad = 10 * S, mh = Math.min((mw - 2 * pad) / mapUnit.asp + 2 * pad, 120 * S);
+  const mx = W - mw - 6 * S, my = bar + 6 * S, iw = mw - 2 * pad, ih = mh - 2 * pad, fit = Math.min(iw, ih * mapUnit.asp);
+  const ox = mx + mw / 2 - fit / 2, oy = my + mh / 2 - fit / mapUnit.asp / 2, hgt = fit / mapUnit.asp;
+  rect(mx, my, mx + mw, my + mh, 'rgba(16,16,16,.72)');
+  const mp = i => [ox + mapUnit.pts[i][0] * fit, oy + mapUnit.pts[i][1] * hgt];
+  ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i <= NSEG; i += 4) { const [a, b] = mp(i % NSEG); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
+  ctx.closePath(); ctx.strokeStyle = '#555'; ctx.lineWidth = 6 * S; ctx.stroke(); ctx.strokeStyle = '#d0d0d0'; ctx.lineWidth = 2.5 * S; ctx.stroke();
+  const [fx, fy] = mp(0); rect(fx - 3 * S, fy - 3 * S, fx + 3 * S, fy + 3 * S, '#fff');
+  for (const r of racers.filter(r => !r.me).concat([player])) {
+    const [a, b] = mp(Math.floor(((r.prog + CAR_Z) % TRACK_LEN) / SEG_LEN) % NSEG);
+    if (r.me) { oval(a, b, 5.5 * S, 5.5 * S, '#fff'); oval(a, b, 3.8 * S, 3.8 * S, '#1e88e5'); }
+    else oval(a, b, 3 * S, 3 * S, r.color);
+  }
+
+  // mirror + speed + turbo (centre column)
+  const cxm = W / 2, kmh = Math.round(speed / MAX_SPEED * 260), mir = save.set.mirror, off = mir ? 52 * S : 0;
+  if (mir) drawMirror(bar + 8 * S);
+  const colW = mx - (sx + 108 * S);
+  tx(String(kmh), cxm, bar + off + 22 * S, 26 * S, '#fff', 'center');
+  tx(tr('km/h'), cxm + 34 * S, bar + off + 24 * S, 10 * S, '#9aa6d4', 'left');
+  const bw = Math.max(60, Math.min(120 * S, colW - 16 * S)), by = bar + off + 38 * S;
+  strokeRect(cxm - bw / 2, by, bw, 9 * S, '#00e5ff', 1.5); rect(cxm - bw / 2 + 1, by + 1, cxm - bw / 2 + 1 + (bw - 2) * turbo / 100, by + 9 * S - 1, turboOn ? '#00e5ff' : '#0288d1');
+  if (crashTimer > 0) tx(tr('CRASH!'), W / 2, bar + 130 * S, 30 * S, '#ff1744', 'center');
+  else if (Math.abs(playerX) > 1 && state === 'play') tx(tr('OFF ROAD'), W / 2, bar + 130 * S, 16 * S, '#ffeb3b', 'center');
+}
+
+/* ================= roadside props, tunnel and F1 car ================= */
+const PSIZE = { palm: 1500, pine: 1500, tree: 1800, bush: 950, cactus: 520, rock: 950, mesa: 3800, lamp: 520, billboard: 1700, banner: 620, grand: 3300, building: 2600, crowd: 1250, marshal: 520 };
+const CROWD = ['#e53935', '#fdd835', '#1e88e5', '#ffffff', '#43a047', '#fb8c00'];
+const BOARD = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#8e24aa'];
+
+function drawProp(p, x, b, s) {
+  const w = PSIZE[p.k] * s * WE / 2;
+  if (w < 1.6 || x + w < 0 || x - w > W) return;
+  const v = p.v, k = p.k;
+  if (k === 'palm') {
+    const h = w * 1.9, tx = x + 0.12 * w * (v - 0.5), ty = b - h;
+    poly('#7a5230', x - 0.05 * w, b, x + 0.05 * w, b, tx + 0.03 * w, ty, tx - 0.03 * w, ty);
+    for (let i = 0; i < 6; i++) {
+      const a = -2.9 + i * 0.58, dx = Math.cos(a), dy = Math.sin(a) * 0.45, px = -Math.sin(a) * 0.07 * w, py = Math.cos(a) * 0.035 * w;
+      poly(i % 2 ? '#2e8b3d' : '#3aa24b', tx, ty, tx + dx * 0.3 * w + px, ty + dy * 0.3 * w + py, tx + dx * 0.62 * w, ty + dy * 0.62 * w + 0.12 * w, tx + dx * 0.3 * w - px, ty + dy * 0.3 * w - py);
+    }
+  } else if (k === 'pine') {
+    const h = w * 2.2;
+    rect(x - 0.05 * w, b - 0.2 * h, x + 0.05 * w, b, '#5d4037');
+    for (let i = 0; i < 3; i++) {
+      const yb = b - 0.14 * h - i * 0.24 * h, hw = w * (0.5 - i * 0.12), ya = yb - 0.42 * h;
+      poly('#1b5e3b', x - hw, yb, x + hw, yb, x, ya);
+      if (T.snow) poly('#ffffff', x - hw * 0.55, yb - 0.2 * h, x + hw * 0.55, yb - 0.2 * h, x, ya);
+    }
+  } else if (k === 'tree') {
+    const h = w * 1.5;
+    rect(x - 0.06 * w, b - 0.42 * h, x + 0.06 * w, b, '#5b3a22');
+    oval(x, b - 0.7 * h, 0.5 * w, 0.32 * h, '#1b5e20'); oval(x - 0.22 * w, b - 0.62 * h, 0.32 * w, 0.24 * h, '#2e7d32'); oval(x + 0.24 * w, b - 0.78 * h, 0.3 * w, 0.22 * h, '#388e3c');
+  } else if (k === 'bush') {
+    const c = T.name === 'Sahara' ? ['#8d8f4d', '#a5a65c'] : ['#2e7d32', '#43a047'];
+    oval(x - 0.2 * w, b - 0.2 * w, 0.32 * w, 0.2 * w, c[0]); oval(x + 0.18 * w, b - 0.22 * w, 0.34 * w, 0.22 * w, c[1]); oval(x, b - 0.3 * w, 0.3 * w, 0.2 * w, c[0]);
+  } else if (k === 'cactus') {
+    const h = w * 3.2, cw = 0.3 * w;
+    rect(x - cw / 2, b - h, x + cw / 2, b, '#3f8f4f'); oval(x, b - h, cw / 2, cw / 2, '#3f8f4f');
+    rect(x - 0.7 * w, b - 0.6 * h, x - cw / 2, b - 0.6 * h + 0.18 * w, '#3f8f4f'); rect(x - 0.7 * w, b - 0.6 * h - 0.5 * w, x - 0.7 * w + cw * 0.6, b - 0.6 * h + 0.18 * w, '#3f8f4f');
+    rect(x + cw / 2, b - 0.45 * h, x + 0.7 * w, b - 0.45 * h + 0.18 * w, '#3f8f4f'); rect(x + 0.7 * w - cw * 0.6, b - 0.45 * h - 0.45 * w, x + 0.7 * w, b - 0.45 * h + 0.18 * w, '#3f8f4f');
+  } else if (k === 'rock') {
+    poly(T.m1, x - 0.5 * w, b, x - 0.38 * w, b - 0.38 * w, x - 0.05 * w, b - 0.55 * w, x + 0.3 * w, b - 0.4 * w, x + 0.5 * w, b);
+    poly('rgba(255,255,255,.18)', x - 0.38 * w, b - 0.38 * w, x - 0.05 * w, b - 0.55 * w, x + 0.05 * w, b - 0.2 * w, x - 0.2 * w, b - 0.1 * w);
+  } else if (k === 'mesa') {
+    const h = w * (0.8 + v * 0.5);
+    poly(T.m1, x - 0.5 * w, b, x - 0.42 * w, b - h, x + 0.42 * w, b - h, x + 0.5 * w, b);
+    for (let i = 1; i < 4; i++) rect(x - 0.5 * w + 0.02 * w * i, b - h * i / 4, x + 0.5 * w - 0.02 * w * i, b - h * i / 4 + h * 0.06, T.m2);
+    rect(x - 0.42 * w, b - h, x + 0.42 * w, b - h + h * 0.05, 'rgba(255,230,200,.35)');
+  } else if (k === 'lamp') {
+    const h = w * 4.4, sd = p.s, top = b - h;
+    rect(x - 0.04 * w, top, x + 0.04 * w, b, '#9aa3ad');
+    rect(Math.min(x, x - sd * 0.5 * w), top, Math.max(x, x - sd * 0.5 * w), top + 0.06 * w, '#9aa3ad');
+    const hx = x - sd * 0.5 * w; rect(hx - 0.13 * w, top + 0.04 * w, hx + 0.13 * w, top + 0.12 * w, '#eceff1');
+    if (T.dark) { ctx.globalAlpha = 0.3; oval(hx, top + 0.12 * w, 0.8 * w, 0.8 * w, '#ffe9a0'); ctx.globalAlpha = 0.12; oval(hx, b - 0.02 * w, 1.1 * w, 0.2 * w, '#ffe9a0'); ctx.globalAlpha = 1; oval(hx, top + 0.1 * w, 0.14 * w, 0.1 * w, '#fff7d0'); }
+  } else if (k === 'billboard') {
+    const bh = w * 0.42, py = b - w * 0.55;
+    rect(x - 0.36 * w, py, x - 0.32 * w, b, '#6d6d6d'); rect(x + 0.32 * w, py, x + 0.36 * w, b, '#6d6d6d');
+    const col = BOARD[Math.floor(v * 5) % 5];
+    rect(x - 0.5 * w, py - bh, x + 0.5 * w, py, '#212121'); rect(x - 0.47 * w, py - bh + 0.03 * w, x + 0.47 * w, py - 0.03 * w, col);
+    if (w > 14) { rect(x - 0.38 * w, py - bh * 0.7, x + 0.1 * w, py - bh * 0.55, '#fff'); rect(x - 0.38 * w, py - bh * 0.42, x + 0.3 * w, py - bh * 0.3, 'rgba(255,255,255,.8)'); }
+    if (T.dark) { ctx.globalAlpha = 0.18; rect(x - 0.6 * w, py - bh - 0.1 * w, x + 0.6 * w, py + 0.1 * w, col); ctx.globalAlpha = 1; }
+  } else if (k === 'banner') {
+    const h = w * 3;
+    rect(x - 0.03 * w, b - h, x + 0.03 * w, b, '#cfd8dc');
+    for (let i = 0; i < 3; i++) rect(x + 0.03 * w, b - h + i * 0.26 * w, x + 0.55 * w, b - h + i * 0.26 * w + 0.22 * w, BOARD[(Math.floor(v * 5) + i) % 5]);
+  } else if (k === 'grand') {
+    const h = w * 0.32;
+    rect(x - 0.5 * w, b - h, x + 0.5 * w, b, '#8a8f99'); rect(x - 0.52 * w, b - h - 0.04 * w, x + 0.52 * w, b - h, BOARD[Math.floor(v * 5) % 5]);
+    if (w > 16) for (let r = 0; r < 3; r++) for (let c = 0; c < 14; c++) rect(x - 0.48 * w + c * 0.07 * w, b - h + 0.03 * w + r * 0.09 * w, x - 0.48 * w + c * 0.07 * w + 0.045 * w, b - h + 0.03 * w + r * 0.09 * w + 0.05 * w, CROWD[(c * 7 + r * 3 + Math.floor(v * 40)) % 6]);
+  } else if (k === 'crowd') {
+    /* spectators behind a barrier, waving flags and arms */
+    const t = performance.now() / 1000, n = 7, bw = 0.5 * w;
+    for (let i = 0; i < n; i++) {
+      const fx = x - bw + (i + 0.5) * (2 * bw / n), ph = t * 5 + i * 1.7 + v * 9, hh = 0.2 * w * (0.85 + ((i * 37 + Math.floor(v * 50)) % 5) * 0.06);
+      const col = CROWD[(i * 5 + Math.floor(v * 30)) % 6], jump = Math.max(0, Math.sin(ph)) * 0.05 * w;
+      rect(fx - 0.035 * w, b - hh * 0.72 - jump, fx + 0.035 * w, b - 0.08 * w - jump, col);
+      oval(fx, b - hh * 0.86 - jump, 0.032 * w, 0.032 * w, '#e8b894');
+      if (w > 12) { ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, 0.012 * w); ctx.beginPath(); ctx.moveTo(fx, b - hh * 0.7 - jump); ctx.lineTo(fx + Math.sin(ph) * 0.05 * w, b - hh * 1.2 - jump); ctx.stroke(); }
+      if (i % 3 === 0 && w > 10) { rect(fx + Math.sin(ph) * 0.05 * w, b - hh * 1.5 - jump, fx + Math.sin(ph) * 0.05 * w + 0.09 * w, b - hh * 1.25 - jump, BOARD[(i + Math.floor(v * 5)) % 5]); }
+    }
+    rect(x - bw - 0.02 * w, b - 0.1 * w, x + bw + 0.02 * w, b, '#b0bec5'); rect(x - bw - 0.02 * w, b - 0.1 * w, x + bw + 0.02 * w, b - 0.08 * w, '#eceff1');
+  } else if (k === 'marshal') {
+    /* track marshal in orange overalls waving a flag */
+    const t = performance.now() / 1000, h = w * 2.6, ph = Math.sin(t * 6 + v * 20), fc = v < 0.34 ? '#fdd835' : v < 0.67 ? '#43e08a' : '#ffffff';
+    rect(x - 0.13 * w, b - 0.55 * h, x - 0.03 * w, b, '#37474f'); rect(x + 0.03 * w, b - 0.55 * h, x + 0.13 * w, b, '#37474f');
+    rect(x - 0.2 * w, b - 0.95 * h, x + 0.2 * w, b - 0.5 * h, '#ff6d00'); rect(x - 0.2 * w, b - 0.78 * h, x + 0.2 * w, b - 0.74 * h, '#fff');
+    oval(x, b - 1.05 * h, 0.15 * w, 0.15 * w, '#e8b894'); rect(x - 0.16 * w, b - 1.14 * h, x + 0.16 * w, b - 1.07 * h, '#fff');
+    const hx = x + p.s * -0.3 * w + ph * 0.1 * w, hy2 = b - 1.35 * h;
+    ctx.strokeStyle = '#ff6d00'; ctx.lineWidth = Math.max(1, 0.07 * w); ctx.beginPath(); ctx.moveTo(x - p.s * 0.2 * w, b - 0.9 * h); ctx.lineTo(hx, hy2); ctx.stroke();
+    ctx.strokeStyle = '#cfd8dc'; ctx.lineWidth = Math.max(1, 0.03 * w); ctx.beginPath(); ctx.moveTo(hx, hy2); ctx.lineTo(hx - p.s * 0.1 * w, hy2 - 0.7 * w); ctx.stroke();
+    poly(fc, hx - p.s * 0.1 * w, hy2 - 0.7 * w, hx - p.s * 0.1 * w - p.s * 0.7 * w, hy2 - 0.62 * w + ph * 0.12 * w, hx - p.s * 0.1 * w - p.s * 0.7 * w, hy2 - 0.2 * w + ph * 0.12 * w, hx - p.s * 0.1 * w, hy2 - 0.3 * w);
+    if (fc === '#ffffff' && w > 10) { rect(hx - p.s * 0.1 * w - p.s * 0.35 * w - 0.1 * w, hy2 - 0.6 * w, hx - p.s * 0.1 * w - p.s * 0.35 * w + 0.1 * w, hy2 - 0.3 * w, '#111'); }
+  } else if (k === 'building') {
+    const h = w * (1.6 + v * 2.4), neon = v > 0.5 ? '#ff2d95' : '#19d3ff';
+    rect(x - 0.5 * w, b - h, x + 0.5 * w, b, '#10162e'); rect(x - 0.5 * w, b - h, x + 0.5 * w, b - h + 0.025 * w, neon);
+    if (w > 14) for (let r = 0; r < 9; r++) for (let c = 0; c < 4; c++) {
+      if (((r * 5 + c * 3 + Math.floor(v * 90)) % 3) === 0) continue;
+      rect(x - 0.4 * w + c * 0.21 * w, b - h + 0.1 * w + r * (h - 0.2 * w) / 9, x - 0.4 * w + c * 0.21 * w + 0.12 * w, b - h + 0.1 * w + r * (h - 0.2 * w) / 9 + 0.1 * w, ((r + c) % 3 ? '#ffd66b' : '#7fe7ff'));
+    }
+  }
+}
+
+/* tunnel: walls, ceiling and lights for one segment */
+function drawTunnelSeg(seg, sx1, sy1, sw1, s1, sx2, sy2, sw2, s2) {
+  const Hc = 1900, t1 = sy1 - s1 * Hc * YS, t2 = sy2 - s2 * Hc * YS, k = 1.28;
+  const l1 = sx1 - sw1 * k, r1 = sx1 + sw1 * k, l2 = sx2 - sw2 * k, r2 = sx2 + sw2 * k;
+  const c = seg.light ? '#1c1f2b' : '#171a25';
+  poly(c, l1, sy1, l1, t1, l2, t2, l2, sy2); poly(c, r1, sy1, r1, t1, r2, t2, r2, sy2);
+  poly('#0d0e14', l1, t1, r1, t1, r2, t2, l2, t2);
+  if (seg.index % 8 < 3) poly('#fff1bd', sx1 - sw1 * 0.14, t1, sx1 + sw1 * 0.14, t1, sx2 + sw2 * 0.14, t2, sx2 - sw2 * 0.14, t2);
+  if (seg.index % 6 === 0) { const wy1 = sy1 - s1 * Hc * 0.3 * YS; rect(l1, wy1 - 0.03 * s1 * Hc * YS, l1 + sw1 * 0.05, wy1 + 0.03 * s1 * Hc * YS, '#ffb300'); rect(r1 - sw1 * 0.05, wy1 - 0.03 * s1 * Hc * YS, r1, wy1 + 0.03 * s1 * Hc * YS, '#ffb300'); }
+}
+const tunnelView = () => {
+  if (!T.zones.some(z => z.tunnel)) return false;
+  const sg = findSeg(position + CAR_Z), ahead = segments[(sg.index + 25) % NSEG];
+  return !!(T.zones[sg.zone].tunnel && T.zones[ahead.zone].tunnel);
+};
+
+/* F1 car seen from behind: wide rear wing, two big rear tyres, halo and shark-fin cover */
+function drawF1(c, cx, by, w, color, accent) {
+  if (w < 2) return;
+  const R = (x0, y0, x1, y1, f) => { c.fillStyle = f; c.fillRect(x0, y0, x1 - x0, y1 - y0); };
+  const P = (f, ...p) => { c.fillStyle = f; c.beginPath(); c.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]); c.closePath(); c.fill(); };
+  const ac = accent || '#f5f5f5';
+  c.fillStyle = '#1b1b1b'; c.beginPath(); c.ellipse(cx, by, 0.55 * w, 0.06 * w, 0, 0, 6.2832); c.fill();
+  for (const sx of [-1, 1]) {                                   // rear tyres with a coloured sidewall stripe
+    const x0 = cx + sx * 0.38 * w;
+    R(x0 - 0.12 * w, by - 0.42 * w, x0 + 0.12 * w, by, '#121212'); R(x0 - 0.12 * w, by - 0.42 * w, x0 + 0.12 * w, by - 0.38 * w, '#2b2b2b');
+    R(x0 - 0.12 * w, by - 0.22 * w, x0 + 0.12 * w, by - 0.2 * w, sx < 0 ? '#e53935' : '#fdd835');
+    R(cx + sx * 0.12 * w, by - 0.24 * w, cx + sx * 0.26 * w, by - 0.2 * w, '#262626');   // wishbones
+  }
+  R(cx - 0.27 * w, by - 0.32 * w, cx + 0.27 * w, by - 0.12 * w, color);                  // sidepods
+  R(cx - 0.27 * w, by - 0.14 * w, cx + 0.27 * w, by - 0.11 * w, '#111');                  // diffuser
+  P(color, cx - 0.13 * w, by - 0.34 * w, cx - 0.07 * w, by - 0.6 * w, cx + 0.07 * w, by - 0.6 * w, cx + 0.13 * w, by - 0.34 * w); // engine cover
+  R(cx - 0.012 * w, by - 0.6 * w, cx + 0.012 * w, by - 0.34 * w, ac);
+  c.fillStyle = ac; c.beginPath(); c.arc(cx, by - 0.585 * w, 0.045 * w, 0, 6.2832); c.fill();   // helmet
+  R(cx - 0.07 * w, by - 0.64 * w, cx + 0.07 * w, by - 0.625 * w, '#1a1a1a'); R(cx - 0.012 * w, by - 0.66 * w, cx + 0.012 * w, by - 0.6 * w, '#1a1a1a'); // halo
+  R(cx - 0.025 * w, by - 0.27 * w, cx + 0.025 * w, by - 0.19 * w, '#ff1744');             // rain light
+  R(cx - 0.04 * w, by - 0.54 * w, cx - 0.02 * w, by - 0.4 * w, '#222'); R(cx + 0.02 * w, by - 0.54 * w, cx + 0.04 * w, by - 0.4 * w, '#222'); // wing pillars
+  R(cx - 0.42 * w, by - 0.68 * w, cx + 0.42 * w, by - 0.6 * w, ac); R(cx - 0.42 * w, by - 0.6 * w, cx + 0.42 * w, by - 0.575 * w, '#111');   // rear wing
+  R(cx - 0.45 * w, by - 0.71 * w, cx - 0.4 * w, by - 0.5 * w, color); R(cx + 0.4 * w, by - 0.71 * w, cx + 0.45 * w, by - 0.5 * w, color);  // endplates
+}
+
+/* night skyline (replaces mountains on city themes) */
+const CITY = Array.from({ length: 34 }, (_, i) => ({ x: i * 19 + Math.random() * 8, w: 11 + Math.random() * 14, h: 22 + Math.random() * 78, lit: Math.random() }));
+function drawSkyline() {
+  const kx = W / 640;
+  for (const [col, f, sc] of [[T.m2, 0.35, 0.7], [T.m1, 0.7, 1]]) {
+    const shift = -((bgScroll * f * kx) % W + W) % W;
+    for (let k = 0; k < 3; k++) for (const b of CITY) {
+      const x = b.x * kx * (1 + (1 - sc) * 0.2) + shift + k * W, h = b.h * sc * S;
+      rect(x, hy - h, x + b.w * kx, hy, col);
+      if (sc === 1 && b.w * kx > 9) for (let r = 0; r < 4; r++) if ((r * 7 + Math.floor(b.lit * 20)) % 3) rect(x + 2 * kx, hy - h + 6 * S + r * h / 5, x + 5 * kx, hy - h + 9 * S + r * h / 5, '#ffd66b');
+    }
+  }
+}
+
+/* ================= weather, fog, particles, zone banner ================= */
+const PART = [], DROPS = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random(), v: 900 + Math.random() * 500 }));
+const DUSTP = Array.from({ length: 34 }, () => ({ x: Math.random(), y: Math.random(), v: 25 + Math.random() * 60, r: 1.5 + Math.random() * 3.5 }));
+let fxPX = 0, fxPY = 0, fxPW = 100, lightning = 0, lightT = 6;
+const SPARK = ['#ffd54f', '#ff9800', '#fff3c0'], CONFETTI = ['#ff5470', '#ffb300', '#43e08a', '#19d3ff', '#ffffff', '#b388ff'];
+
+function emit(x, y, vx, vy, life, color, size, grav) {
+  if (PART.length < 260) PART.push({ x, y, vx, vy, life, max: life, color, size, grav });
+}
+function drawFog() {
+  const f = T.fog; if (!f) return;
+  const y0 = hy - 50 * S, y1 = hy + (carY - hy) * 0.45, g = ctx.createLinearGradient(0, y0, 0, y1), m = (hy - y0) / (y1 - y0);
+  const c = a => 'rgba(' + f[0] + ',' + f[1] + ',' + f[2] + ',' + a + ')';
+  g.addColorStop(0, c(0)); g.addColorStop(m, c(f[3])); g.addColorStop(1, c(0));
+  ctx.fillStyle = g; ctx.fillRect(0, y0, W, y1 - y0);
+}
+function drawWeather() {
+  const low = QUALITY[save.set.quality] < 0.7, dt = frameDt;
+  if (T.weather === 'rain') {
+    const n = low ? 60 : DROPS.length, len = (10 + 14 * speed / MAX_SPEED) * S;
+    ctx.strokeStyle = 'rgba(205,220,240,.5)'; ctx.lineWidth = Math.max(1, S); ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const d = DROPS[i]; d.y += d.v * dt / H; d.x -= 0.05 * dt;
+      if (d.y > 1) { d.y = -0.05; d.x = Math.random(); }
+      const x = ((d.x % 1) + 1) % 1 * W, y = d.y * H; ctx.moveTo(x, y); ctx.lineTo(x - len * 0.18, y + len);
+    }
+    ctx.stroke();
+    if (state !== 'paused') { lightT -= dt; if (lightT < 0) { lightning = 0.38; lightT = 7 + Math.random() * 9; } }
+    if (lightning > 0) { rect(0, 0, W, H, 'rgba(235,245,255,' + (lightning * (0.6 + 0.4 * Math.sin(lightning * 40))).toFixed(3) + ')'); lightning -= dt * 1.1; }
+  } else if (T.weather === 'dust') {
+    const n = low ? 16 : DUSTP.length; ctx.fillStyle = T.dust; ctx.globalAlpha = 0.2;
+    for (let i = 0; i < n; i++) {
+      const d = DUSTP[i]; d.x -= (d.v + speed / MAX_SPEED * 140) * dt / W; if (d.x < -0.05) { d.x = 1.05; d.y = Math.random(); }
+      const y = hy + 10 * S + d.y * (H - hy - 20 * S); ctx.beginPath(); ctx.ellipse(d.x * W, y, d.r * 5 * S, d.r * S, 0, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+function drawParticles() {
+  const dt = frameDt, px = fxPX, py = fxPY, pw = fxPW;
+  if (fx.crash) {
+    for (let i = 0; i < 22; i++) emit(px + rnd(-0.3, 0.3) * pw, py - 0.3 * pw, rnd(-240, 240) * S, rnd(-320, -60) * S, rnd(0.35, 0.7), SPARK[i % 3], rnd(2, 3.5) * S, 700 * S);
+    fx.crash = false;
+  }
+  if (state === 'play' && Math.abs(playerX) > 1 && speed > OFFROAD_LIMIT) {
+    for (let i = 0; i < 2; i++) emit(px + (i ? 1 : -1) * 0.45 * pw, py - 0.05 * pw, rnd(-70, 70) * S + (i ? 40 : -40) * S, rnd(-110, -30) * S, rnd(0.35, 0.7), T.dust || T.g2, rnd(3, 7) * S, 120 * S);
+  }
+  if (turboOn) for (let i = 0; i < 2; i++) emit(px + (i ? 1 : -1) * 0.3 * pw, py - 0.1 * pw, rnd(-30, 30) * S, rnd(60, 170) * S, rnd(0.18, 0.3), i ? '#ff9100' : '#fff59d', rnd(2, 4) * S, 0);
+  if (state === 'finished' && lastRank <= 3 && raceTime - player.finish < 8) for (let i = 0; i < 3; i++) emit(Math.random() * W, -6, rnd(-40, 40) * S, rnd(110, 220) * S, 3.2, CONFETTI[(Math.random() * 6) | 0], rnd(4, 7) * S, 0);
+  for (let i = PART.length - 1; i >= 0; i--) {
+    const p = PART[i]; p.life -= dt; if (p.life <= 0) { PART.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.grav * dt;
+    ctx.globalAlpha = Math.min(1, p.life / p.max * 1.6); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawFx() { drawWeather(); drawParticles(); }
+function drawZoneBanner() {
+  if (zoneBanner <= 0 || state === 'paused') return;
+  const a = Math.min(1, zoneBanner / 0.6, (2.6 - zoneBanner) / 0.3 + 0.001), y = 34 * S + 86 * S;
+  ctx.font = '700 ' + 17 * S + 'px "Chakra Petch","Cairo",Arial,sans-serif';
+  const tw = ctx.measureText(tr(zoneName).toUpperCase()).width + 36 * S;
+  ctx.globalAlpha = clamp(a, 0, 1);
+  rect(W / 2 - tw / 2, y - 15 * S, W / 2 + tw / 2, y + 15 * S, 'rgba(0,0,0,.6)'); rect(W / 2 - tw / 2, y + 13 * S, W / 2 + tw / 2, y + 15 * S, '#ffb300');
+  tx(tr(zoneName).toUpperCase(), W / 2, y, 17 * S, '#fff', 'center');
+  ctx.globalAlpha = 1;
+}
+
+/* ================= rear-view mirror ================= */
+function drawMirror(top) {
+  const mw = 132 * S, mh = 40 * S, mx = W / 2 - mw / 2, my = top, hz = my + mh * 0.38;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
+  const sk = ctx.createLinearGradient(0, my, 0, hz); sk.addColorStop(0, T.sky[0]); sk.addColorStop(1, T.sky[T.sky.length - 1]);
+  ctx.fillStyle = sk; ctx.fillRect(mx, my, mw, hz - my);
+  ctx.fillStyle = T.m1; ctx.fillRect(mx, hz - mh * 0.08, mw, mh * 0.08);
+  ctx.fillStyle = T.g1; ctx.fillRect(mx, hz, mw, my + mh - hz);
+  const cx = mx + mw / 2 - playerX * mw * 0.06, rb = mw * 0.46, rt = mw * 0.03;
+  poly(T.rum1, cx - rb * 1.1, my + mh, cx + rb * 1.1, my + mh, cx + rt * 1.1, hz, cx - rt * 1.1, hz);
+  poly(T.road1, cx - rb, my + mh, cx + rb, my + mh, cx + rt, hz, cx - rt, hz);
+  let near = 0;
+  const behind = [];
+  for (const r of racers) {
+    if (r.me) continue;
+    const d = wrapD(player.prog - r.prog);
+    if (d > 0 && d < 4200) behind.push([d, r]);
+  }
+  behind.sort((a, b) => b[0] - a[0]);
+  for (const [d, r] of behind) {
+    const k = 1 / (1 + d / 380), y = hz + (my + mh - hz) * k * 0.92, hw = rt + (rb - rt) * k;
+    const x = cx + (r.offset) * hw * 0.62, w = mw * 0.34 * k + 3 * S;
+    drawCar(ctx, x, y, w, r.color, r.kind, r.accent);
+    if (d < 700) near = Math.max(near, 1 - d / 700);
+  }
+  if (near > 0) { ctx.fillStyle = 'rgba(255,40,60,' + (0.1 + 0.2 * near * (0.5 + 0.5 * Math.sin(performance.now() / 90))).toFixed(3) + ')'; ctx.fillRect(mx, my, mw, mh); }
+  const gl = ctx.createLinearGradient(mx, my, mx + mw, my + mh); gl.addColorStop(0, 'rgba(255,255,255,.22)'); gl.addColorStop(0.35, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(255,255,255,.06)');
+  ctx.fillStyle = gl; ctx.fillRect(mx, my, mw, mh);
+  ctx.restore();
+  ctx.strokeStyle = '#0c0f1c'; ctx.lineWidth = 4 * S; ctx.strokeRect(mx - 1, my - 1, mw + 2, mh + 2);
+  ctx.strokeStyle = '#7d89b8'; ctx.lineWidth = 1.2; ctx.strokeRect(mx - 3 * S, my - 3 * S, mw + 6 * S, mh + 6 * S);
+}
+
+/* ================= screens ================= */
+const IN_APP = /NitroApp/.test(navigator.userAgent);
+const scr = document.getElementById('screen');
+let curScreen = 'home', shopTab = 'up', resetArm = false, resetTimer = 0;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const NOTR = new Set(['English', 'Français', 'العربية']);
+const seg = (key, opts) => '<div class="seg" role="group">' + opts.map(([label, v]) =>
+  '<button data-act="set|' + key + '|' + v + '" class="' + (String(save.set[key]) === String(v) ? 'on' : '') + '">' + (typeof label === 'string' && label.length > 1 && !/^[0-9]+$/.test(label) && !NOTR.has(label) ? tr(label) : label) + '</button>').join('') + '</div>';
+const coinsPill = () => '<span class="coins" dir="ltr"><i></i>' + save.coins.toLocaleString('en-US') + '</span>';
+
+function setPlayUI(on) {
+  document.getElementById('touch').hidden = !on;
+  document.getElementById('pauseBtn').hidden = !on;
+  document.getElementById('bGas').hidden = save.set.autoGas;
+}
+function showScreen(name) {
+  const keep = scr.scrollTop;
+  if (!name) { scr.hidden = true; return; }
+  const same = name === curScreen && !scr.hidden;
+  curScreen = name; scr.hidden = false;
+  scr.className = 'screen' + (name === 'pause' ? ' clear' : '');
+  scr.innerHTML = ({ home: homeHTML, shop: shopHTML, settings: settingsHTML, pause: pauseHTML, result: resultHTML, awards: awardsHTML })[name]();
+  scr.scrollTop = same ? keep : 0;
+  if (name === 'shop') paintCanvases();
+  if (name === 'result' && !same) startPodium();
+}
+
+function homeHTML() {
+  const th = THEMES[save.set.track], best = save.best[save.set.track + ':' + save.set.level + ':' + save.set.laps], got = ACH.filter(a => save.ach[a.id]).length;
+  const chips = TRACK_IDS.map(id => {
+    const t = THEMES[id], own = save.tracks.includes(id);
+    return '<button data-act="track|' + id + '" class="' + (save.set.track === id ? 'on' : '') + (own ? '' : ' lock') + '">' + tr(t.name) + (own ? '' : ' <span>' + price(t.cost) + '</span>') + '</button>';
+  }).join('');
+  return '<div class="wrap home"><div class="col">' +
+    '<div class="top"><div><h1 class="logo" dir="ltr">Nitro<span>Circuit</span></h1><p class="tag">' + tr('11 cars, 6 circuits. Win coins, buy F1 cars, unlock every track.') + '</p></div></div>' +
+    '<div class="langs">' + LANGS.map(([k, n]) => '<button data-act="set|lang|' + k + '" class="' + (save.set.lang === k ? 'on' : '') + '">' + n + '</button>').join('') + '</div><div class="row">' + coinsPill() + '<span class="muted">' + tr('{0} races, {1} wins', save.races, save.wins) + '</span></div>' +
+    '<div class="card"><div class="row"><h3>' + tr('Circuit') + '</h3><span class="muted">' + esc(tr(curCar().name)) + '</span></div><div class="chips">' + chips + '</div><div class="muted">' + esc(th.blurb) + '. Zones: ' + th.zones.map(z => esc(z.name)).join(', ') + '.</div></div></div>' +
+    '<div class="col"><div class="card"><div class="row"><h3>' + tr('Difficulty') + '</h3></div>' + seg('level', [[tr('Easy'), 'EASY'], [tr('Normal'), 'NORMAL'], [tr('Hard'), 'HARD']]) +
+    '<div class="row"><h3>' + tr('Laps') + '</h3></div>' + seg('laps', [['1', 1], ['2', 2], ['3', 3], ['5', 5]]) +
+    '<div class="stat muted"><span>' + tr('Best race time') + '</span><b>' + (best ? fmtTime(best) : '--:--.--') + '</b></div>' +
+    '<div class="stat muted"><span>' + tr('Pays') + '</span><b>' + tr('up to {0} coins', Math.round(PAY[0] * DIFFICULTY[save.set.level].pay * th.pay * save.set.laps / 3)) + '</b></div></div>' +
+    '<button class="btn primary" data-act="play">' + tr('Race') + '</button>' +
+    '<div class="grid3"><button class="btn" data-act="go|shop">' + tr('Garage') + '</button><button class="btn" data-act="go|awards">' + tr('Awards') + ' ' + got + '/' + ACH.length + '</button><button class="btn" data-act="go|settings">' + tr('Settings') + '</button></div></div></div>';
+}
+function pauseHTML() {
+  return '<div class="wrap"><h2 style="text-align:center">' + tr('Paused') + '</h2>' +
+    '<button class="btn primary" data-act="resume">' + tr('Resume') + '</button>' +
+    '<div class="grid2"><button class="btn" data-act="restart">' + tr('Restart') + '</button><button class="btn" data-act="go|settings">' + tr('Settings') + '</button></div>' +
+    '<button class="btn" data-act="menu">' + tr('Quit to menu') + '</button></div>';
+}
+function resultHTML() {
+  const order = standings();
+  const rows = order.map((r, i) => '<tr class="' + (r.me ? 'me' : '') + '"><td>' + (i + 1) + '</td><td><span class="dot" style="background:' + r.color + '"></span>' + esc(dn(r)) +
+    '</td><td style="text-align:end">' + (r.finish !== null ? fmtTime(r.finish) : tr('racing')) + '</td></tr>').join('');
+  const head = lastRank === 1 ? tr('You won') : lastRank <= 3 ? tr('Podium finish, {0}', ordn(lastRank)) : tr('Finished {0}', ordn(lastRank));
+  return '<div class="wrap"><div style="text-align:center"><h2>' + head + '</h2>' +
+    '<div class="earn">' + tr('+{0} coins', reward) + '</div>' +
+    '<div class="muted">' + (newBest ? tr('New best time on {0}, {1} laps', esc(tr(T.name)), laps) : tr('Your time {0}', fmtTime(player.finish)) + (bestLap ? ', ' + tr('best lap {0}', fmtTime(bestLap)) : '')) + '</div></div>' +
+    '<canvas id="podium" class="podium" width="640" height="300"></canvas>' +
+    '<details class="card"><summary>' + tr('Full results') + '</summary><table class="res"><tbody>' + rows + '</tbody></table></details>' +
+    '<button class="btn primary" data-act="play">' + tr('Race again') + '</button>' +
+    '<div class="grid2"><button class="btn" data-act="go|shop">' + tr('Garage') + '</button><button class="btn" data-act="menu">' + tr('Menu') + '</button></div></div>';
+}
+/* podium ceremony: top three step up onto blocks, trophy for the winner, medals for all */
+let podiumT0 = 0, podiumRaf = 0;
+function podiumDraw(now) {
+  const c = document.getElementById('podium');
+  if (!c || curScreen !== 'result' || scr.hidden) { podiumRaf = 0; return; }
+  const g = c.getContext('2d'), w = c.width, h = c.height, t = (now - podiumT0) / 1000, order = standings().slice(0, 3);
+  g.clearRect(0, 0, w, h);
+  const lg = g.createRadialGradient(w / 2, 0, 10, w / 2, 0, h * 1.1); lg.addColorStop(0, 'rgba(255,220,120,.28)'); lg.addColorStop(1, 'rgba(255,220,120,0)');
+  g.fillStyle = lg; g.fillRect(0, 0, w, h);
+  const slots = [[0, 0.5, 118, '#ffc400', '1'], [1, 0.2, 84, '#cfd8dc', '2'], [2, 0.8, 62, '#cd7f32', '3']], base = h - 14;
+  for (const [idx, fx, bh, medal, num] of slots) {
+    const r = order[idx]; if (!r) continue;
+    const delay = idx === 0 ? 0.9 : idx === 1 ? 0.4 : 0, k = Math.min(1, Math.max(0, (t - delay) / 0.7)), e = 1 - Math.pow(1 - k, 3);
+    const cx = w * fx, bw = 168, top = base - bh * e;
+    g.fillStyle = '#18214a'; g.fillRect(cx - bw / 2, top, bw, bh * e);
+    g.fillStyle = medal; g.fillRect(cx - bw / 2, top, bw, 6);
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(cx - bw / 2, top + 6, bw * 0.5, bh * e);
+    if (bh * e > 30) { g.fillStyle = medal; g.font = '700 ' + Math.round(bh * 0.5) + 'px Chakra Petch, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.9; g.fillText(num, cx, top + bh * e * 0.42); g.globalAlpha = 1; }
+    const hop = k >= 1 ? Math.max(0, Math.sin(t * 6 + idx * 2)) * 3 * (r.me ? 1.4 : 0.5) : 0;
+    drawCar(g, cx, top - 4 - hop, 124, r.color, r.kind, r.accent);
+    g.fillStyle = r.me ? '#ffb300' : '#eef2ff'; g.font = '600 15px Chakra Petch, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    if (k > 0.9 && bh * e > 60) g.fillText(dn(r), cx, base - 10);
+    if (idx === 0 && k > 0.95) {                           /* trophy above the winner */
+      const ty = top - 92, p = Math.min(1, (t - 1.6) / 0.5); if (p > 0) {
+        g.globalAlpha = Math.max(0, p); g.fillStyle = '#ffc400'; g.beginPath(); g.moveTo(cx - 20, ty - 26); g.lineTo(cx + 20, ty - 26); g.quadraticCurveTo(cx + 18, ty + 4, cx, ty + 8); g.quadraticCurveTo(cx - 18, ty + 4, cx - 20, ty - 26); g.fill();
+        g.strokeStyle = '#ffc400'; g.lineWidth = 4; g.beginPath(); g.arc(cx - 22, ty - 16, 8, Math.PI / 2, Math.PI * 1.5); g.stroke(); g.beginPath(); g.arc(cx + 22, ty - 16, 8, -Math.PI / 2, Math.PI / 2); g.stroke();
+        g.fillRect(cx - 3, ty + 6, 6, 9); g.fillRect(cx - 12, ty + 14, 24, 5); g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(cx - 12, ty - 22, 4, 18); g.globalAlpha = 1;
+      }
+    }
+  }
+  podiumRaf = requestAnimationFrame(podiumDraw);
+}
+function startPodium() { podiumT0 = performance.now(); if (!podiumRaf) podiumRaf = requestAnimationFrame(podiumDraw); }
+function awardsHTML() {
+  const got = ACH.filter(a => save.ach[a.id]).length;
+  return '<div class="wrap"><div class="top"><button class="btn small" data-act="back">' + tr('Back') + '</button><h2>' + tr('Awards') + '</h2><span class="coins">' + got + '/' + ACH.length + '</span></div>' +
+    ACH.map(a => '<div class="card"><div class="row"><div><h3 style="color:var(--fg)">' + esc(tr(a.name)) + '</h3><div class="muted">' + esc(tr(a.desc)) + '</div></div>' +
+      '<div class="aw ' + (save.ach[a.id] ? 'done' : '') + '">' + (save.ach[a.id] ? tr('Done') : '+' + a.coins) + '</div></div></div>').join('') +
+    '<p class="hint">' + tr('Each award pays coins the first time you earn it.') + '</p></div>';
+}
+function settingsHTML() {
+  const tog = k => seg(k, [[tr('On'), true], [tr('Off'), false]]);
+  const rw = (name, note, ctl) => row(tr(name), note ? tr(note) : '', ctl);
+  const row = (name, note, ctl) => '<div class="card"><div class="row"><div><h3>' + name + '</h3>' + (note ? '<div class="muted">' + note + '</div>' : '') + '</div></div>' + ctl + '</div>';
+  return '<div class="wrap"><div class="top"><button class="btn small" data-act="back">' + tr('Back') + '</button><h2>' + tr('Settings') + '</h2><span></span></div>' +
+    rw('Difficulty', 'Easy: slower rivals, forgiving crashes', seg('level', [[tr('Easy'), 'EASY'], [tr('Normal'), 'NORMAL'], [tr('Hard'), 'HARD']])) +
+    rw('Laps', '', seg('laps', [['1', 1], ['2', 2], ['3', 3], ['5', 5]])) +
+    rw('Camera', 'Switch in a race with C on a keyboard', seg('cam', [[tr('Chase'), 0], [tr('High'), 1], [tr('Cockpit'), 2]])) +
+    rw('Auto gas', 'Off adds a GAS button', tog('autoGas')) +
+    rw('Steering', '', seg('steer', [[tr('Soft'), 0.8], [tr('Normal'), 1], [tr('Sharp'), 1.25]])) +
+    rw('Button size', '', seg('ctrl', [[tr('Small'), 0.85], [tr('Medium'), 1], [tr('Large'), 1.2]])) +
+    rw('Graphics', 'Lower it if the game stutters', seg('quality', [[tr('Low'), 0], [tr('Medium'), 1], [tr('High'), 2]])) +
+    rw('Music', '', tog('music')) + rw('Sound effects', '', tog('sfx')) + rw('Rear-view mirror', 'Shows cars behind you', tog('mirror')) + rw('Vibration', 'On crashes, where the phone allows it', tog('vibrate')) +
+    rw('Language', '', seg('lang', LANGS.map(([k, n]) => [n, k]))) + '<div class="grid2">' + (IN_APP ? '' : '<button class="btn" data-act="fs">' + tr('Fullscreen') + '</button>') + '<button class="btn" data-act="reset" style="' + (resetArm ? 'background:var(--bad);color:#fff' : '') + '">' + tr(resetArm ? 'Tap again to erase' : 'Reset progress') + '</button></div></div>';
+}
+
+function pips(l) { let s = '<div class="pips">'; for (let i = 0; i < UP_MAX; i++) s += '<b class="' + (i < l ? 'on' : '') + '"></b>'; return s + '</div>'; }
+const bar = (label, v) => '<div class="barrow"><span>' + label + '</span><div class="bar"><i style="width:' + Math.round(clamp(v, 0.05, 1) * 100) + '%"></i></div></div>';
+const priceLbl = n => price(n) === 0 ? tr('Free') : tr('{0} coins', n);
+function shopHTML() {
+  let body = '';
+  if (shopTab === 'up') {
+    body = UPGRADES.map(u => {
+      const l = up(u.id), max = l >= UP_MAX, cost = price(UP_COST[l]);
+      return '<div class="card"><div class="upg"><div><h3>' + esc(tr(u.name)) + ' <span class="muted">' + tr('level {0}/{1}', l, UP_MAX) + '</span></h3><div class="muted">' + esc(tr(u.desc)) + (l ? '. ' + tr('Now {0}', u.fx(l)) : '') + '</div></div>' +
+        '<button class="btn small" data-act="up|' + u.id + '" ' + (max || save.coins < cost ? 'disabled' : '') + '>' + (max ? tr('Maxed') : priceLbl(UP_COST[l])) + '</button>' + pips(l) + '</div></div>';
+    }).join('');
+  } else if (shopTab === 'paint') {
+    body = '<div class="swatches">' + PAINTS.map(p => {
+      const own = save.owned.includes(p.id), sel = save.paint === p.id;
+      return '<div class="sw ' + (sel ? 'sel' : '') + '"><canvas width="168" height="124" data-c="' + p.color + '" data-k="' + curCar().kind + '" data-a="' + (curCar().accent || '') + '"></canvas><div class="nm">' + esc(tr(p.name)) + '</div>' +
+        '<button class="btn small" data-act="paint|' + p.id + '" ' + (!own && save.coins < price(p.cost) ? 'disabled' : '') + '>' + (sel ? tr('Equipped') : own ? tr('Equip') : priceLbl(p.cost)) + '</button></div>';
+    }).join('') + '</div>';
+  } else if (shopTab === 'cars') {
+    body = CARS.map(c => {
+      const own = save.cars.includes(c.id), sel = save.car === c.id;
+      return '<div class="card ' + (sel ? 'selc' : '') + '"><div class="carc"><canvas width="168" height="124" data-c="' + paintColor() + '" data-k="' + c.kind + '" data-a="' + (c.accent || '') + '"></canvas><div class="carx">' +
+        '<h3 style="color:var(--fg)">' + esc(tr(c.name)) + '</h3><div class="muted">' + esc(tr(c.note)) + '</div>' +
+        bar(tr('Speed'), (c.top - 0.9) / 0.3) + bar(tr('Accel'), (c.acc - 0.8) / 0.7) + bar(tr('Handling'), (c.hnd - 0.9) / 0.3) + '</div></div>' +
+        '<button class="btn small" data-act="car|' + c.id + '" ' + (!own && save.coins < price(c.cost) ? 'disabled' : '') + '>' + (sel ? tr('Equipped') : own ? tr('Equip') : priceLbl(c.cost)) + '</button></div>';
+    }).join('');
+  } else {
+    body = TRACK_IDS.map(id => {
+      const t = THEMES[id], own = save.tracks.includes(id), sel = save.set.track === id;
+      return '<div class="card ' + (sel ? 'selc' : '') + '"><canvas class="tprev" width="320" height="120" data-th="' + id + '"></canvas>' +
+        '<div class="row"><div><h3 style="color:var(--fg)">' + esc(tr(t.name)) + '</h3><div class="muted">' + esc(tr(t.blurb)) + '</div></div><span class="muted">x' + t.pay.toFixed(2) + '</span></div>' +
+        '<div class="muted">' + tr('Zones: {0}', t.zones.map(z => esc(tr(z.name))).join(', ')) + '</div>' +
+        '<button class="btn small" data-act="trk|' + id + '" ' + (!own && save.coins < price(t.cost) ? 'disabled' : '') + '>' + (sel ? tr('Selected') : own ? tr('Select') : tr('Unlock for {0} coins', price(t.cost))) + '</button></div>';
+    }).join('');
+  }
+  const tabs = [['up', 'Upgrades'], ['paint', 'Paint'], ['cars', 'Cars'], ['trk', 'Circuits'], ['code', 'Secret code']];
+  if (shopTab === 'code') body = '<div class="card"><h3>' + tr('Secret code') + '</h3>' + (save.free ? '<div class="earn" style="font-size:22px">' + tr('Everything is free') + '</div>' : '') +
+    '<div class="codebox"><input id="codeIn" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" dir="ltr" placeholder="' + esc(tr('Enter code')) + '"><button class="btn small" data-act="code">' + tr('Apply') + '</button></div></div>';
+  return '<div class="wrap"><div class="top"><button class="btn small" data-act="back">' + tr('Back') + '</button><h2>' + tr('Garage') + '</h2>' + coinsPill() + '</div>' +
+    '<div class="card" style="align-items:center"><canvas id="prev" width="300" height="160" data-c="' + paintColor() + '" data-k="' + curCar().kind + '" data-a="' + (curCar().accent || '') + '" style="width:150px;height:80px"></canvas></div>' +
+    '<div class="seg tabs wrapx">' + tabs.map(([k, l]) => '<button data-act="tab|' + k + '" class="' + (shopTab === k ? 'on' : '') + '">' + tr(l) + '</button>').join('') + '</div>' +
+    body + '<p class="hint">' + tr('Win races to earn coins. Harder levels and later circuits pay more.') + '</p></div>';
+}
+function paintCanvases() {
+  scr.querySelectorAll('canvas[data-c]').forEach(c => {
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = '#2a3768'; g.fillRect(0, c.height - 6, c.width, 6);
+    drawCar(g, c.width / 2, c.height - 16, c.width * 0.62, c.dataset.c, c.dataset.k, c.dataset.a || null);
+  });
+  scr.querySelectorAll('canvas[data-th]').forEach(c => {
+    const th = THEMES[c.dataset.th], g = c.getContext('2d'), w = c.width, h = c.height, hz = h * 0.55;
+    th.sky.forEach((col, i) => { g.fillStyle = col; g.fillRect(0, i * hz / th.sky.length, w, hz / th.sky.length + 1); });
+    const o = th.sun || th.moon; if (o) { g.fillStyle = o.c; g.beginPath(); g.arc(w * o.x, hz * Math.min(o.y, 0.8), o.r * 0.5, 0, 6.2832); g.fill(); }
+    g.fillStyle = th.m1; g.beginPath(); g.moveTo(0, hz);
+    for (const [x, dy] of th.s1) g.lineTo(x * w / 640, hz + dy * 0.7); g.lineTo(w, hz); g.fill();
+    g.fillStyle = th.g1; g.fillRect(0, hz, w, h - hz);
+    g.fillStyle = th.rum1; g.beginPath(); g.moveTo(w / 2 - 14, hz); g.lineTo(w / 2 + 14, hz); g.lineTo(w / 2 + 140, h); g.lineTo(w / 2 - 140, h); g.fill();
+    g.fillStyle = th.road1; g.beginPath(); g.moveTo(w / 2 - 11, hz); g.lineTo(w / 2 + 11, hz); g.lineTo(w / 2 + 120, h); g.lineTo(w / 2 - 120, h); g.fill();
+    g.fillStyle = th.lane; for (let i = 0; i < 4; i++) { const y = hz + 8 + i * i * 4 + i * 12; g.fillRect(w / 2 - 1 - i, y, 2 + i * 2, 5 + i * 3); }
+    if (th.zones.some(z => z.tunnel)) { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, 0, 0, 0); }
+  });
+}
+
+
+/* ================= actions ================= */
+function flash(msg, gold) {
+  const host = document.getElementById('app');
+  const d = document.createElement('div'); d.className = 'flash' + (gold ? ' gold' : ''); d.textContent = msg;
+  const n = host.querySelectorAll('.flash').length; d.style.top = (14 + n * 9) + '%';
+  host.appendChild(d); setTimeout(() => d.remove(), gold ? 2600 : 1600);
+}
+let backTo = 'home';
+function applyCar() { if (player) { player.color = paintColor(); player.kind = curCar().kind; player.accent = curCar().accent; } }
+function changeTrack(id) {
+  save.set.track = id; persist();
+  if (state === 'menu') { loadTrack(id); position = 0; playerX = 0; makeRacers(false); player.prog = 0; }
+}
+function act(a) {
+  const [name, p1, p2] = a.split('|');
+  if (name === 'play') { startRace(); }
+  else if (name === 'resume') togglePause();
+  else if (name === 'restart') startRace();
+  else if (name === 'menu') enterMenu();
+  else if (name === 'go') { backTo = state === 'paused' ? 'pause' : state === 'finished' ? 'result' : 'home'; showScreen(p1); }
+  else if (name === 'back') { showScreen(backTo); }
+  else if (name === 'tab') { shopTab = p1; showScreen('shop'); }
+  else if (name === 'track') {
+    if (save.tracks.includes(p1)) { changeTrack(p1); showScreen('home'); }
+    else { shopTab = 'trk'; backTo = 'home'; showScreen('shop'); flash(tr('{0} is locked', tr(THEMES[p1].name))); }
+  }
+  else if (name === 'trk') {
+    const t = THEMES[p1];
+    if (!save.tracks.includes(p1)) { if (save.coins < price(t.cost)) return; save.coins -= price(t.cost); save.tracks.push(p1); flash(tr('{0} unlocked', tr(t.name)), true); chime(); checkAch(); }
+    changeTrack(p1); persist(); showScreen('shop');
+  }
+  else if (name === 'car') {
+    const c = CARS.find(x => x.id === p1);
+    if (!save.cars.includes(p1)) { if (save.coins < price(c.cost)) return; save.coins -= price(c.cost); save.cars.push(p1); flash(tr('{0} bought', tr(c.name)), true); chime(); }
+    save.car = p1; persist(); applyCar(); checkAch(); showScreen('shop');
+  }
+  else if (name === 'set') {
+    const cur = save.set[p1]; let v = p2;
+    if (v === 'true') v = true; else if (v === 'false') v = false; else v = Number.isNaN(+v) ? v : +v;
+    if (cur === v) return;
+    save.set[p1] = v; persist();
+    if (p1 === 'quality' || p1 === 'ctrl') resize();
+    if ((p1 === 'sfx' || p1 === 'music') && v) audioInit();
+    if (p1 === 'level') { D = DIFFICULTY[v]; }
+    if (p1 === 'lang') applyLang();
+    if (p1 === 'autoGas') { document.getElementById('bGas').hidden = v; resize(); }
+    showScreen(curScreen);
+  }
+  else if (name === 'up') {
+    const l = up(p1), cost = price(UP_COST[l]);
+    if (l < UP_MAX && save.coins >= cost) { save.coins -= cost; save.up[p1] = l + 1; persist(); beep(660, 0.12); flash(tr('{0} level {1}', tr(UPGRADES.find(u => u.id === p1).name), l + 1)); checkAch(); showScreen('shop'); }
+  }
+  else if (name === 'paint') {
+    const p = PAINTS.find(x => x.id === p1);
+    if (!save.owned.includes(p1)) { if (save.coins < price(p.cost)) return; save.coins -= price(p.cost); save.owned.push(p1); flash(tr('{0} unlocked', tr(p.name))); }
+    save.paint = p1; persist(); applyCar(); showScreen('shop');
+  }
+  else if (name === 'code') {
+    const v = ((document.getElementById('codeIn') || {}).value || '').trim().toLowerCase();
+    if (v === 'yahyaa') {
+      save.free = true; TRACK_IDS.forEach(id => { if (!save.tracks.includes(id)) save.tracks.push(id); });
+      CARS.forEach(c => { if (!save.cars.includes(c.id)) save.cars.push(c.id); });
+      PAINTS.forEach(p => { if (!save.owned.includes(p.id)) save.owned.push(p.id); });
+      UPGRADES.forEach(u => { save.up[u.id] = UP_MAX; });
+      persist(); chime(); checkAch(); showScreen('shop'); flash(tr('Code accepted: everything is free'), true);
+    } else flash(tr('Wrong code'));
+  }
+  else if (name === 'fs') {
+    const el = document.documentElement;
+    (el.requestFullscreen ? el.requestFullscreen() : Promise.reject()).then(() => { try { return screen.orientation.lock('landscape'); } catch (e) {} }).catch(() => flash(tr('Fullscreen is not available here')));
+  }
+  else if (name === 'reset') {
+    if (!resetArm) { resetArm = true; clearTimeout(resetTimer); resetTimer = setTimeout(() => { resetArm = false; if (curScreen === 'settings') showScreen('settings'); }, 3000); }
+    else { resetArm = false; save = defaults(); persist(); resize(); enterMenu(); flash(tr('Progress erased')); }
+    showScreen('settings');
+  }
+}
+scr.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && !b.disabled) { audioInit(); act(b.dataset.act); } });
+
+/* ================= boot with splash ================= */
+const splash = document.getElementById('splash'), splashBar = document.getElementById('splashBar'), splashPct = document.getElementById('splashPct');
+let splashOn = true, splashShown = performance.now(), splashPctV = 0, splashTarget = 0;
+function splashStep(p) { splashTarget = Math.max(splashTarget, p); }
+function splashTick() {
+  if (!splashOn) return;
+  const el = performance.now() - splashShown, minShow = 2300;
+  const cap = Math.min(1, el / minShow);                 /* bar never outruns the minimum display time */
+  splashPctV += (Math.min(splashTarget, cap) - splashPctV) * 0.18;
+  const pc = Math.round(splashPctV * 100);
+  splashBar.style.width = pc + '%'; splashPct.textContent = pc + '%';
+  if (splashTarget >= 1 && el >= minShow && splashPctV > 0.985) { endSplash(); return; }
+  requestAnimationFrame(splashTick);
+}
+function endSplash() {
+  splashBar.style.width = '100%'; splashPct.textContent = '100%';
+  splash.classList.add('out'); setTimeout(() => { splash.hidden = true; splashOn = false; }, 450);
+  splashOn = false; splashOut = true;
+}
+let splashOut = false;
+splashTick();
+
+loadSave(); pickLang(); applyLang(); splashStep(0.25);
+bindHold(document.getElementById('bL'), 'left'); bindHold(document.getElementById('bR'), 'right');
+bindHold(document.getElementById('bBrake'), 'brake'); bindHold(document.getElementById('bTurbo'), 'turbo');
+bindHold(document.getElementById('bGas'), 'gas');
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+splashStep(0.5);
+resize(); enterMenu(); splashStep(0.75);
+let lastT = 0;
+const errSeen = new Set();
+function showErr(where, e) {                 /* never let one bad frame freeze the game; show the reason instead */
+  const m = where + ': ' + (e && e.message || e); if (errSeen.has(m)) return; errSeen.add(m);
+  let d = document.getElementById('errBox');
+  if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:absolute;left:8px;right:8px;top:44px;z-index:60;background:rgba(160,0,30,.92);color:#fff;font:12px/1.35 monospace;padding:8px 10px;border-radius:8px;user-select:text;-webkit-user-select:text;pointer-events:auto;direction:ltr;text-align:left'; document.getElementById('app').appendChild(d); }
+  d.textContent = (d.textContent ? d.textContent + '\n' : 'Error report, send this to Yahya:\n') + m + ((e && e.stack) ? ' @ ' + String(e.stack).split('\n')[1] : '');
+  d.style.whiteSpace = 'pre-wrap';
+}
+function frame(now) {
+  let dt = (now - lastT) / 1000; lastT = now; if (!(dt > 0)) dt = 0.016; dt = Math.min(0.05, dt); frameDt = dt;
+  try { update(dt); } catch (e) { showErr('update', e); }
+  try { render(); } catch (e) { showErr('render', e); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+const fontsReady = (document.fonts && document.fonts.ready) ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]) : Promise.resolve();
+fontsReady.then(() => { splashStep(1); });
+
+/* Android back button: returns true when the game handled it */
+window.__back = function () {
+  if (splashOn) return true;
+  if (state === 'play' || state === 'paused') { togglePause(); return true; }
+  if (state === 'countdown' || state === 'finished') { enterMenu(); return true; }
+  if (curScreen !== 'home' && !scr.hidden) { act('back'); return true; }
+  return false;
+};
+</script>
+
+</body></html>
