@@ -1,0 +1,12 @@
+{
+  "background_color": "#080d16",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Nitro cricuit",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Nitro",
+  "start_url": "/",
+  "theme_color": "#080d16",
+  "description": "Ultimate Mobile Racing Game"
+}
