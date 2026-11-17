@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "Nitro Circuit",
+  "short_name": "Nitro",
+  "description": "Nitro Circuit — mobile-friendly arcade racing game.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#080c1a",
+  "theme_color": "#080c1a",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
